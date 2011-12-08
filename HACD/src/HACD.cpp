@@ -54,7 +54,7 @@ public:
 					uv,sizeof(hacd::HaF32)*2,dummyIndex,
 					uv,sizeof(hacd::HaF32)*2,dummyIndex);
 
-				dgMeshEffect *result = mesh.CreateConvexApproximation(0.1f,desc.mMaxHullCount);
+				dgMeshEffect *result = mesh.CreateConvexApproximation(desc.mConcavity,desc.mMaxHullCount);
 
 				if ( result )
 				{

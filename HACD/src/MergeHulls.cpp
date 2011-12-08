@@ -1,9 +1,9 @@
 #include "MergeHulls.h"
 #include "ConvexHull.h"
+#include "SparseArray.h"
 
 #include <string.h>
 #include <math.h>
-#include <hash_map>
 
 #pragma warning(disable:4100 4189 4996)
 
@@ -12,7 +12,7 @@ using namespace hacd;
 namespace HACD
 {
 
-typedef stdext::hash_map< HaU32, HaF32 > TestedMap;
+typedef SparseArray< HaF32 > TestedMap;
 
 static HaF32 fm_computeBestFitAABB(HaU32 vcount,const HaF32 *points,HaU32 pstride,HaF32 *bmin,HaF32 *bmax) // returns the diagonal distance
 {
@@ -177,7 +177,7 @@ class MyMergeHullsInterface : public MergeHullsInterface, public hacd::UserAlloc
 public:
 	MyMergeHullsInterface(void)
 	{
-
+		mHasBeenTested = NULL;
 	}
 
 	virtual ~MyMergeHullsInterface(void)
@@ -191,7 +191,10 @@ public:
 		hacd::HaU32 mergeHullCount)
 	{
 		mGuid = 0;
-		mHasBeenTested.clear();
+
+		HaU32 count = (HaU32)inputHulls.size();
+		mHasBeenTested = HACD_NEW(TestedMap)(count*count);
+
 		HaU32 maxMergeCount=0;
 		if ( maxMergeCount < inputHulls.size() )
 		{
@@ -224,7 +227,7 @@ public:
 			mh.mVertices = ch->mVertices;
 			outputHulls.push_back(mh);
 		}
-
+		delete mHasBeenTested;
 		return (HaU32)outputHulls.size();
 	}
 
@@ -335,15 +338,15 @@ public:
 						hashIndex = (cr->mGuid << 16 ) | match->mGuid;
 					}
 					HaF32 combinedVolume;
-					TestedMap::iterator found = mHasBeenTested.find(hashIndex);
-					if ( found == mHasBeenTested.end() )
+					HaF32 *v = mHasBeenTested->find(hashIndex);
+					if ( v == NULL )
 					{
 						combinedVolume = canMerge(cr,match);
-						mHasBeenTested[hashIndex] = combinedVolume;
+						(*mHasBeenTested)[hashIndex] = combinedVolume;
 					}
 					else
 					{
-						combinedVolume = (*found).second;
+						combinedVolume = *v;
 					}
 					if ( combinedVolume != 0 )
 					{
@@ -408,7 +411,7 @@ public:
 	}
 
 private:
-	TestedMap			mHasBeenTested;
+	TestedMap			*mHasBeenTested;
 	HaU32				mGuid;
 	HaF32				mTotalVolume;
 	CHullVector			mChulls;

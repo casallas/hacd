@@ -26,6 +26,7 @@ public:
 		const hacd::HaU32	*mIndices;
 		hacd::HaU32			mMaxHullCount;
 		hacd::HaU32			mMaxHullVertices;
+		hacd::HaF32			mConcavity;
 		void init(void)
 		{
 			mTriangleCount = 0;
@@ -34,6 +35,7 @@ public:
 			mIndices = NULL;
 			mMaxHullCount = 256;
 			mMaxHullVertices = 64;
+			mConcavity = 0.2f;
 		}
 	};
 

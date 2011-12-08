@@ -29,8 +29,6 @@
 #include "dgPlane.h"
 #include "dgMatrix.h"
 
-class dgWorld;
-class dgCollision;
 class dgMeshEffect;
 class dgMeshEffectSolidTree;
 class dgMeshTreeCSGEdgePool;
@@ -116,7 +114,6 @@ class dgMeshEffect: public dgPolyhedra, public dgRefCounter
 
 
 	dgMeshEffect(bool preAllocaBuffers);
-	dgMeshEffect(dgCollision* const collision);
 	dgMeshEffect(const dgMeshEffect& source);
 	dgMeshEffect(dgPolyhedra& mesh, const dgMeshEffect& source);
 
@@ -140,17 +137,6 @@ class dgMeshEffect: public dgPolyhedra, public dgRefCounter
 	void CylindricalMapping (hacd::HaI32 cylinderMaterial, hacd::HaI32 capMaterial);
 
 	dgEdge* InsertEdgeVertex (dgEdge* const edge, hacd::HaF64 param);
-
-	dgMeshEffect* Union (const dgMatrix& matrix, const dgMeshEffect* const clip) const;
-	dgMeshEffect* Difference (const dgMatrix& matrix, const dgMeshEffect* const clip) const;
-	dgMeshEffect* Intersection (const dgMatrix& matrix, const dgMeshEffect* const clip) const;
-	void ClipMesh (const dgMatrix& matrix, const dgMeshEffect* const clip, dgMeshEffect** const top, dgMeshEffect** const bottom) const;
-
-	bool CheckIntersection (const dgMeshEffectSolidTree* const solidTree, hacd::HaF64 scale) const;
-	dgMeshEffectSolidTree* CreateSolidTree() const;
-	static void DestroySolidTree (dgMeshEffectSolidTree* const tree);
-	static bool CheckIntersection (const dgMeshEffect* const meshA, const dgMeshEffectSolidTree* const solidTreeA,
-								   const dgMeshEffect* const meshB, const dgMeshEffectSolidTree* const solidTreeB, hacd::HaF64 scale);
 
 	dgMeshEffect* GetFirstLayer ();
 	dgMeshEffect* GetNextLayer (dgMeshEffect* const layer);
@@ -194,7 +180,6 @@ class dgMeshEffect: public dgPolyhedra, public dgRefCounter
 	void RepairTJoints (bool triangulate);
 	bool SeparateDuplicateLoops (dgEdge* const edge);
 	bool HasOpenEdges () const;
-	hacd::HaF64 CalculateVolume () const;
 
 	void GetVertexStreams (hacd::HaI32 vetexStrideInByte, hacd::HaF32* const vertex, 
 						   hacd::HaI32 normalStrideInByte, hacd::HaF32* const normal, 
@@ -219,13 +204,7 @@ class dgMeshEffect: public dgPolyhedra, public dgRefCounter
 	
 	dgConvexHull3d * dgMeshEffect::CreateConvexHull(hacd::HaF64 tolerance,hacd::HaI32 maxVertexCount) const;
 
-	dgCollision* CreateConvexCollision(hacd::HaF64 tolerance, hacd::HaI32 shapeID, const dgMatrix& matrix = dgGetIdentityMatrix()) const;
-
 	dgMeshEffect* CreateConvexApproximation (hacd::HaF32 maxConcavity, hacd::HaI32 maxCount = 32) const;
-	dgMeshEffect* CreateDelanayTretrahedralization (hacd::HaI32 interionMaterial, dgMatrix& matrix) const;
-	dgMeshEffect* CreateVoronoiPartition (hacd::HaI32 pointsCount, hacd::HaI32 pointStrideInBytes, const hacd::HaF32* const pointCloud, hacd::HaI32 interionMaterial, dgMatrix& matrix) const;
-
-	void PlaneClipMesh (const dgMatrix& planeMatrix, const dgMatrix& planeTextMatrix, hacd::HaI32 planeMaterial, dgMeshEffect** const leftMeshSource, dgMeshEffect** const rightMeshSource) const;
 
 	dgVertexAtribute& GetAttribute (hacd::HaI32 index) const;
 	void TransformMesh (const dgMatrix& matrix);
@@ -277,15 +256,6 @@ class dgMeshEffect: public dgPolyhedra, public dgRefCounter
 	dgMeshEffect* GetNextLayer (hacd::HaI32 mark);
 
 	void FilterCoplanarFaces (const dgMeshEffect* const otherCap, hacd::HaF32 sign);
-	void ClipMesh (const dgMeshEffect* const clipMesh, dgMeshEffect** const back, dgMeshEffect** const front, dgMeshEffect** const coplanar) const;
-	void ClipMesh (const dgMeshEffectSolidTree* const clipper, dgMeshEffect** const back, dgMeshEffect** const front, dgMeshEffect** const coplanar) const;
-
-	hacd::HaI32 PlaneApplyCap (const dgMeshEffect* planeMesh, const dgBigPlane& normal);
-	void PlaneClipMesh (const dgMeshEffect* planeMesh, dgMeshEffect** leftMeshSource, dgMeshEffect** rightMeshSource) const;
-
-	dgMeshEffect* MakeDelanayIntersection (dgMeshEffectSolidTree* const tree, dgBigVector* const points, hacd::HaI32 count, hacd::HaI32 materialId, const dgMatrix& textureProjectionMatrix, hacd::HaF32 normalAngleInRadians) const;
-
-	
 
 	bool CheckSingleMesh() const;
 
@@ -356,11 +326,6 @@ inline hacd::HaF64* dgMeshEffect::GetUV0Pool() const
 inline hacd::HaF64* dgMeshEffect::GetUV1Pool() const 
 {
 	return &m_attib->m_u1;
-}
-
-inline bool dgMeshEffect::CheckIntersection (const dgMeshEffect* const meshA, const dgMeshEffectSolidTree* const solidTreeA, const dgMeshEffect* const meshB, const dgMeshEffectSolidTree* const solidTreeB, hacd::HaF64 scale)
-{
-	return (meshA->CheckIntersection (solidTreeB, scale) || meshB->CheckIntersection (solidTreeA, scale));
 }
 
 inline hacd::HaI32 dgMeshEffect::GetVertexStrideInByte() const 

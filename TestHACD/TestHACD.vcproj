@@ -216,14 +216,6 @@
 					>
 				</File>
 				<File
-					RelativePath="..\HACD\src\dgMeshEffect2.cpp"
-					>
-				</File>
-				<File
-					RelativePath="..\HACD\src\dgMeshEffect3.cpp"
-					>
-				</File>
-				<File
 					RelativePath="..\HACD\src\dgPolyhedra.cpp"
 					>
 				</File>
@@ -331,6 +323,10 @@
 					RelativePath="..\HACD\include\dgVector.h"
 					>
 				</File>
+				<File
+					RelativePath="..\HACD\include\SparseArray.h"
+					>
+				</File>
 			</Filter>
 			<Filter
 				Name="public"
@@ -349,6 +345,10 @@
 				</File>
 				<File
 					RelativePath="..\HACD\public\PlatformConfigHACD.h"
+					>
+				</File>
+				<File
+					RelativePath="..\HACD\public\PxVector.h"
 					>
 				</File>
 				<File

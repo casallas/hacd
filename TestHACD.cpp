@@ -53,6 +53,7 @@ void main(int argc,const char ** argv)
 		printf("Options:\r\n");
 		printf("-v	<count>	: Max Hull Vertices (default 64)\r\n");
 		printf("-m	<count>	: Maximum number of hulls (default 256)\r\n");
+		printf("-c <concavity> : Between 0 and 1; default is 0.2.  The smaller the number, the more convex hulls are produced.\r\n");
 		printf("\r\n");
 		printf("Example: TestHACD hornbug.obj -m 40 -v 64\r\n");
 		printf("\r\n");
@@ -73,6 +74,11 @@ void main(int argc,const char ** argv)
 			else if ( strcmp(option,"-m") == 0 )
 			{
 				desc.mMaxHullCount = getIntArg(scan+1,argc,argv);
+				scan+=2;
+			}
+			else if ( strcmp(option,"-c") == 0 )
+			{
+				desc.mConcavity = getFloatArg(scan+1,argc,argv);
 				scan+=2;
 			}
 			else

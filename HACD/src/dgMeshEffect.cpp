@@ -22,6 +22,7 @@
 #include "dgMeshEffect.h"
 #include "dgConvexHull3d.h"
 #include "dgStack.h"
+#include "dgSphere.h"
 #include <string.h>
 
 #pragma warning(disable:4100)
@@ -121,132 +122,6 @@ dgMeshEffect::dgMeshEffect(const dgMeshEffect& source)
 	memcpy (m_attib, source.m_attib, m_atribCount * sizeof(dgVertexAtribute));
 }
 
-
-dgMeshEffect::dgMeshEffect(dgCollision* const collision)
-	:dgPolyhedra () 
-{
-	HACD_ALWAYS_ASSERT(); // not implemented in the reduced source version
-#if 0  // UNUSED
-	class dgMeshEffectBuilder
-	{
-		public:
-		dgMeshEffectBuilder ()
-		{
-			m_brush = 0;
-			m_faceCount = 0;
-			m_vertexCount = 0;
-			m_maxFaceCount = 32;
-			m_maxVertexCount = 32;
-			m_vertex = (dgVector*) HACD_ALLOC(m_maxVertexCount * sizeof(dgVector));
-			m_faceIndexCount = (hacd::HaI32*) HACD_ALLOC(m_maxFaceCount * sizeof(hacd::HaI32));
-		}
-
-		~dgMeshEffectBuilder ()
-		{
-			HACD_FREE (m_faceIndexCount);
-			HACD_FREE (m_vertex);
-		}
-
-		static void GetShapeFromCollision (void* userData, hacd::HaI32 vertexCount, const hacd::HaF32* faceVertex, hacd::HaI32 id)
-		{
-			hacd::HaI32 vertexIndex; 
-			dgMeshEffectBuilder& builder = *((dgMeshEffectBuilder*)userData);
-
-
-			if (builder.m_faceCount >= builder.m_maxFaceCount) {
-				hacd::HaI32* index;
-
-				builder.m_maxFaceCount *= 2;
-				index = (hacd::HaI32*) HACD_ALLOC(builder.m_maxFaceCount * sizeof(hacd::HaI32));
-				memcpy (index, builder.m_faceIndexCount, builder.m_faceCount * sizeof(hacd::HaI32));
-				HACD_FREE(builder.m_faceIndexCount);
-				builder.m_faceIndexCount = index;
-			}
-			builder.m_faceIndexCount[builder.m_faceCount] = vertexCount;
-			builder.m_faceCount = builder.m_faceCount + 1;
-
-			vertexIndex = builder.m_vertexCount; 
-			hacd::HaF32 brush = hacd::HaF32 (builder.m_brush);
-			for (hacd::HaI32 i = 0; i < vertexCount; i ++) {
-				if (vertexIndex >= builder.m_maxVertexCount) {
-					dgVector* points;
-
-					builder.m_maxVertexCount *= 2;
-					points = (dgVector*) HACD_ALLOC(builder.m_maxVertexCount * sizeof(dgVector));
-					memcpy (points, builder.m_vertex, vertexIndex * sizeof(dgVector));
-					HACD_FREE(builder.m_vertex);
-					builder.m_vertex = points;
-				}
-
-				builder.m_vertex[vertexIndex].m_x = faceVertex[i * 3 + 0];
-				builder.m_vertex[vertexIndex].m_y = faceVertex[i * 3 + 1];
-				builder.m_vertex[vertexIndex].m_z = faceVertex[i * 3 + 2];
-				builder.m_vertex[vertexIndex].m_w = brush;
-				vertexIndex ++;
-			}
-
-			builder.m_vertexCount = vertexIndex;
-		}
-
-		hacd::HaI32 m_brush;
-		hacd::HaI32 m_vertexCount;
-		hacd::HaI32 m_maxVertexCount;
-
-		hacd::HaI32 m_faceCount;
-		hacd::HaI32 m_maxFaceCount;
-
-		dgVector* m_vertex;
-		hacd::HaI32* m_faceIndexCount;
-	};
-
-	dgMeshEffectBuilder builder;
-
-	if (collision->IsType (dgCollision::dgCollisionCompound_RTTI)) {
-		dgCollisionInfo collisionInfo;
-		collision->GetCollisionInfo (&collisionInfo);
-
-		dgMatrix matrix (collisionInfo.m_offsetMatrix);
-		//dgCollisionInfo::dgCoumpountCollisionData& data = collisionInfo.m_compoundCollision;
-		//for (hacd::HaI32 i = 0; i < data.m_chidrenCount; i ++) {
-		dgCollisionCompound* const compoundCollision = (dgCollisionCompound*) collision;
-		//for (void* node = collisionInfo.m_compoundCollision)
-		hacd::HaI32 brush = 0;
-		for (dgTree<dgCollisionCompound::dgNodeBase*, dgCollisionConvex*>::dgTreeNode* node = compoundCollision->GetFirstNode(); node; node = compoundCollision->GetNextNode(node)) {
-			builder.m_brush = brush;
-			brush ++;
-			//dgCollision* const childShape = data.m_chidren[i];
-			dgCollision* const childShape = compoundCollision->GetCollisionFromNode(node);
-			childShape->DebugCollision (matrix, (OnDebugCollisionMeshCallback) dgMeshEffectBuilder::GetShapeFromCollision, &builder);
-		}
-
-	} else {
-		dgMatrix matrix (dgGetIdentityMatrix());
-		collision->DebugCollision (matrix, (OnDebugCollisionMeshCallback) dgMeshEffectBuilder::GetShapeFromCollision, &builder);
-	}
-
-	dgStack<hacd::HaI32>indexList (builder.m_vertexCount);
-
-	dgVertexListToIndexList (&builder.m_vertex[0].m_x, sizeof (dgVector), sizeof (dgVector), 0, builder.m_vertexCount, &indexList[0], DG_VERTEXLIST_INDEXLIST_TOL);	
-
-	dgStack<hacd::HaI32> materialIndex(builder.m_faceCount);
-	dgStack<hacd::HaI32> m_normalUVIndex(builder.m_vertexCount);
-
-	dgVector normalUV(hacd::HaF32 (0.0f), hacd::HaF32 (0.0f), hacd::HaF32 (0.0f), hacd::HaF32 (0.0f));
-
-	memset (&materialIndex[0], 0, size_t (materialIndex.GetSizeInBytes()));
-	memset (&m_normalUVIndex[0], 0, size_t (m_normalUVIndex.GetSizeInBytes()));
-
-	Init(true);
-	BuildFromVertexListIndexList(builder.m_faceCount, builder.m_faceIndexCount, &materialIndex[0],
-								 &builder.m_vertex[0].m_x, sizeof (dgVector), &indexList[0],
-								 &normalUV.m_x, sizeof (dgVector), &m_normalUVIndex[0],
-								 &normalUV.m_x, sizeof (dgVector), &m_normalUVIndex[0],
-								 &normalUV.m_x, sizeof (dgVector), &m_normalUVIndex[0]);
-
-        RepairTJoints(true);
-	CalculateNormals(hacd::HaF32 (45.0f * 3.1416f/180.0f));
-#endif
-}
 
 dgMeshEffect::~dgMeshEffect(void)
 {
@@ -498,8 +373,6 @@ void dgMeshEffect::RemoveUnusedVertices(hacd::HaI32* const vertexMap)
 
 dgMatrix dgMeshEffect::CalculateOOBB (dgBigVector& size) const
 {
-	HACD_ALWAYS_ASSERT(); // not implemented in the reduced source version
-#if 0  // UNUSED
 	dgSphere sphere (CalculateSphere (&m_points[0].m_x, sizeof (dgBigVector), NULL));
 	size = sphere.m_size;
 
@@ -517,15 +390,10 @@ dgMatrix dgMeshEffect::CalculateOOBB (dgBigVector& size) const
 	}
 
 	return sphere;
-#endif
-	dgMatrix _emtpy;
-	return _emtpy;
 }
 
 void dgMeshEffect::CalculateAABB (dgBigVector& minBox, dgBigVector& maxBox) const
 {
-	HACD_ALWAYS_ASSERT(); // not implemented in the reduced source version
-#if 0  // UNUSED
 	dgBigVector minP ( hacd::HaF64 (1.0e15f),  hacd::HaF64 (1.0e15f),  hacd::HaF64 (1.0e15f), hacd::HaF64 (0.0f)); 
 	dgBigVector maxP (-hacd::HaF64 (1.0e15f), -hacd::HaF64 (1.0e15f), -hacd::HaF64 (1.0e15f), hacd::HaF64 (0.0f)); 
 
@@ -546,7 +414,6 @@ void dgMeshEffect::CalculateAABB (dgBigVector& minBox, dgBigVector& maxBox) cons
 
 	minBox = minP;
 	maxBox = maxP;
-#endif
 }
 
 void dgMeshEffect::EnumerateAttributeArray (dgVertexAtribute* const attib)
@@ -2097,318 +1964,6 @@ dgConvexHull3d * dgMeshEffect::CreateConvexHull(hacd::HaF64 tolerance,hacd::HaI3
 }
 
 
-dgCollision* dgMeshEffect::CreateConvexCollision(hacd::HaF64 tolerance, hacd::HaI32 shapeID, const dgMatrix& srcMatrix) const
-{
-//	HACD_ALWAYS_ASSERT(); // not implemented in the reduced source version
-#if 0  // UNUSED
-	dgStack<dgVector> poolPtr (m_pointCount * 2); 
-	dgVector* const pool = &poolPtr[0];
-
-	dgBigVector minBox;
-	dgBigVector maxBox;
-	CalculateAABB (minBox, maxBox);
-	dgVector com ((minBox + maxBox).Scale (hacd::HaF32 (0.5f)));
-
-	hacd::HaI32 count = 0;
-	hacd::HaI32 mark = IncLRU();
-	dgPolyhedra::Iterator iter (*this);
-	for (iter.Begin(); iter; iter ++){
-		dgEdge* const vertex = &(*iter);
-		if (vertex->m_mark != mark) {
-			dgEdge* ptr = vertex;
-			do {
-				ptr->m_mark = mark;
-				ptr = ptr->m_twin->m_next;
-			} while (ptr != vertex);
-
-			if (count < hacd::HaI32 (poolPtr.GetElementsCount())) {
-				const dgBigVector p = m_points[vertex->m_incidentVertex];
-				pool[count] = dgVector (p) - com;
-				count ++;
-			}
-		}
-	}
-
-	dgMatrix matrix (srcMatrix);
-	matrix.m_posit += matrix.RotateVector(com);
-	matrix.m_posit.m_w = hacd::HaF32 (1.0f);
-
-	dgStack<hacd::HaI32> buffer(hacd::HaI32 (2 + 3 * count + sizeof (dgMatrix) / sizeof (hacd::HaI32)));  
-
-	memset (&buffer[0], 0, size_t (buffer.GetSizeInBytes()));
-	buffer[0] = m_convexHullCollision;
-	buffer[1] = shapeID;
-	for (hacd::HaI32 i = 0; i < count; i ++) {
-		buffer[2 + i * 3 + 0] = hacd::HaI32 (dgCollision::Quantize (pool[i].m_x));
-		buffer[2 + i * 3 + 1] = hacd::HaI32 (dgCollision::Quantize (pool[i].m_y));
-		buffer[2 + i * 3 + 2] = hacd::HaI32 (dgCollision::Quantize (pool[i].m_z));
-	}
-	memcpy (&buffer[2 + count * 3], &matrix, sizeof (dgMatrix));
-	hacd::HaU32 crc = dgCollision::MakeCRC(&buffer[0], buffer.GetSizeInBytes());
-
-	dgCollisionConvexHull* collision = HACD_NEW(dgCollisionConvexHull) (crc, count, sizeof (dgVector), hacd::HaF32 (tolerance), &pool[0].m_x, matrix);
-	if (!collision->GetVertexCount()) {
-		collision->Release();
-		collision = NULL;
-	} else {
-		collision->SetUserDataID (hacd::HaU32 (shapeID));
-	}
-
-	return collision;
-#else
-	return NULL;
-#endif
-}
-
-
-/*
-dgEdge* dgMeshEffect::InsertFaceVertex (dgEdge* const face, const dgVector& point)
-{
-	hacd::HaI32 v0;
-	hacd::HaI32 v1;
-	hacd::HaI32 v2;
-	hacd::HaI32 vertexIndex;
-	hacd::HaI32 attibuteIndex;
-	hacd::HaF32 va;
-	hacd::HaF32 vb;
-	hacd::HaF32 vc;
-	hacd::HaF32 den;
-	hacd::HaF32 alpha0;
-	hacd::HaF32 alpha1;
-	hacd::HaF32 alpha2;
-	hacd::HaF32 alpha3;
-	hacd::HaF32 alpha4;
-	hacd::HaF32 alpha5;
-	hacd::HaF32 alpha6;
-	dgVertexAtribute attribute;
-	dgEdge* face0;
-	dgEdge* face1;
-	dgEdge* face2;
-	dgEdge* const edge0;
-	dgEdge* twin0;
-	dgEdge* const edge1;
-	dgEdge* twin1;
-	dgEdge* const edge2;
-	dgEdge* twin2;
-
-
-	v0 = face->m_incidentVertex;
-	v1 = face->m_next->m_incidentVertex;
-	v2 = face->m_prev->m_incidentVertex;
-
-	const dgVector& p0 = m_points[v0];
-	const dgVector& p1 = m_points[v1];
-	const dgVector& p2 = m_points[v2];
-
-	dgVector p10 (p1 - p0);
-	dgVector p20 (p2 - p0);
-	dgVector p_p0 (point - p0);
-	dgVector p_p1 (point - p1);
-	dgVector p_p2 (point - p2);
-
-	alpha1 = p10 % p_p0;
-	alpha2 = p20 % p_p0;
-	alpha3 = p10 % p_p1;
-	alpha4 = p20 % p_p1;
-	alpha5 = p10 % p_p2;
-	alpha6 = p20 % p_p2;
-
-	HACD_ASSERT (!((alpha1 <= hacd::HaF32 (0.0f)) && (alpha2 <= hacd::HaF32 (0.0f))));
-	HACD_ASSERT (!((alpha6 >= hacd::HaF32 (0.0f)) && (alpha5 <= alpha6)));
-	HACD_ASSERT (!((alpha3 >= hacd::HaF32 (0.0f)) && (alpha4 <= alpha3)));
-
-	vc = alpha1 * alpha4 - alpha3 * alpha2;
-	vb = alpha5 * alpha2 - alpha1 * alpha6;
-	va = alpha3 * alpha6 - alpha5 * alpha4;
-
-	HACD_ASSERT (!((vc <= hacd::HaF32 (0.0f)) && (alpha1 >= hacd::HaF32 (0.0f)) && (alpha3 <= hacd::HaF32 (0.0f))));
-	HACD_ASSERT (!((vb <= hacd::HaF32 (0.0f)) && (alpha2 >= hacd::HaF32 (0.0f)) && (alpha6 <= hacd::HaF32 (0.0f))));
-	HACD_ASSERT (!((va <= hacd::HaF32 (0.0f)) && ((alpha4 - alpha3) >= hacd::HaF32 (0.0f)) && ((alpha5 - alpha6) >= hacd::HaF32 (0.0f))));
-
-	den = float(hacd::HaF32 (1.0f)) / (va + vb + vc);
-
-	alpha0 = va * den;
-	alpha1 = vb * den;
-	alpha2 = vc * den;
-
-
-	//dgVector p (p0.Scale (alpha0) + p1.Scale (alpha1) + p2.Scale (alpha2));
-	//alpha3 *= 1;
-
-
-	const dgVertexAtribute& attr0 = m_attib[face->m_userData];
-	const dgVertexAtribute& attr1 = m_attib[face->m_next->m_userData];
-	const dgVertexAtribute& attr2 = m_attib[face->m_prev->m_userData];
-	dgVector normal (attr0.m_normal.m_x * alpha0 + attr1.m_normal.m_x * alpha1 + attr0.m_normal.m_x * alpha2,
-					 attr0.m_normal.m_y * alpha0 + attr1.m_normal.m_y * alpha1 + attr0.m_normal.m_y * alpha2,
-					 attr0.m_normal.m_z * alpha0 + attr1.m_normal.m_z * alpha1 + attr0.m_normal.m_z * alpha2, hacd::HaF32 (0.0f));
-	normal = normal.Scale (dgRsqrt (normal % normal));
-
-	attribute.m_vertex.m_x = point.m_x;
-	attribute.m_vertex.m_y = point.m_y;
-	attribute.m_vertex.m_z = point.m_z;
-	attribute.m_normal.m_y = normal.m_y;
-	attribute.m_normal.m_z = normal.m_z;
-	attribute.m_normal.m_x = normal.m_x;
-	attribute.m_normal.m_y = normal.m_y;
-	attribute.m_normal.m_z = normal.m_z;
-	attribute.m_u = attr0.m_u * alpha0 +  attr1.m_u * alpha1 + attr2.m_u * alpha2;
-	attribute.m_v = attr0.m_v * alpha0 +  attr1.m_v * alpha1 + attr2.m_v * alpha2;
-	HACD_ASSERT (attr0.m_material == attr1.m_material);
-	HACD_ASSERT (attr0.m_material == attr2.m_material);
-	AddVertex (&attribute.m_vertex.m_x, attr0.m_material);
-
-	vertexIndex = m_pointCount - 1;
-	attibuteIndex = m_atribCount - 1;
-
-	face0 = face;
-	face1 = face->m_next;
-	face2 = face->m_prev;
-
-	edge0 = AddHalfEdge(vertexIndex, v0);
-	twin0 = AddHalfEdge(v0, vertexIndex);
-
-	edge1 = AddHalfEdge(vertexIndex, v1);
-	twin1 = AddHalfEdge(v1, vertexIndex);
-
-	edge2 = AddHalfEdge(vertexIndex, v2);
-	twin2 = AddHalfEdge(v2, vertexIndex);
-
-	edge0->m_incidentFace = face->m_incidentFace;
-	twin0->m_incidentFace = face->m_incidentFace; 
-
-	edge1->m_incidentFace = face->m_incidentFace;
-	twin1->m_incidentFace = face->m_incidentFace;
-
-	edge2->m_incidentFace = face->m_incidentFace;
-	twin2->m_incidentFace = face->m_incidentFace;
-
-	edge0->m_userData = attibuteIndex;
-	edge1->m_userData = attibuteIndex;
-	edge2->m_userData = attibuteIndex;
-
-	twin0->m_userData = face0->m_userData;
-	edge1->m_userData = face1->m_userData;
-	edge2->m_userData = face2->m_userData;
-
-	edge0->m_twin = twin0;
-	twin0->m_twin = edge0;
-
-	edge1->m_twin = twin1;
-	twin1->m_twin = edge1;
-
-	edge2->m_twin = twin2;
-	twin2->m_twin = edge2;
-
-	edge0->m_next = face0;
-	edge1->m_next = face1;
-	edge2->m_next = face2;
-
-	edge0->m_prev = twin1;
-	edge1->m_prev = twin2;
-	edge2->m_prev = twin0;
-
-	twin0->m_next = edge2;
-	twin1->m_next = edge0;
-	twin2->m_next = edge1;
-
-	twin0->m_prev = face2;
-	twin1->m_prev = face0;
-	twin2->m_prev = face1;
-
-	face0->m_next = twin1;
-	face1->m_next = twin2;
-	face2->m_next = twin0;
-
-	face0->m_prev = edge0;
-	face1->m_prev = edge1;
-	face2->m_prev = edge2;
-
-	return edge0;
-}
-
-
-hacd::HaI32 dgMeshEffect::RayIntersection (hacd::HaF32& p0p1, const dgVector& p0, const dgVector& p1, hacd::HaF32& q0q1, const dgVector& q0, const dgVector& q1) const
-{
-	hacd::HaI32 ret;
-	hacd::HaF64 a;
-	hacd::HaF64 b;
-	hacd::HaF64 c;
-	hacd::HaF64 d;
-	hacd::HaF64 e;
-	hacd::HaF64 D;
-	dgBigVector ray_p0 (p0);
-	dgBigVector ray_p1 (p1);
-	dgBigVector ray_q0 (q0);
-	dgBigVector ray_q1 (q1);
-	dgBigVector u (ray_p1 - ray_p0);
-	dgBigVector v (ray_q1 - ray_q0);
-
-	a = u % u;        // always >= 0
-	b = u % v;
-	c = v % v;        // always >= 0
-	D = a*c - b*b;   // always >= 0
-
-	ret = 0;
-	if (D > hacd::HaF64 (1.0e-8f)) { // the lines are almost parallel
-		hacd::HaF64 sN;
-		hacd::HaF64 tN;
-		hacd::HaF64 fracsN;
-		hacd::HaF64 fractN;
-		dgBigVector w (ray_p0 - ray_q0);
-
-		ret = 1;
-
-		d = u % w;
-		e = v % w;
-		sN = (b*e - c*d) / D;
-		tN = (a*e - b*d) / D;
-		fracsN = DG_QUANTIZE_TOLERANCE / sqrt (a);
-		fractN = DG_QUANTIZE_TOLERANCE / sqrt (c);
-
-		if (sN < -fracsN) {
-			ret = 0;
-		} else if (sN < fracsN) {
-			sN = hacd::HaF64 (0.0f);
-		}
-		if (sN > (hacd::HaF64 (1.0f) + fracsN)) {
-			ret = 0;
-		} else if (sN > (hacd::HaF64 (1.0f) - fracsN)) {
-			sN = hacd::HaF64 (1.0f);
-		}
-
-		if (tN < -fractN) {
-			ret = 0;
-		} else if (tN < fractN) {
-			tN = hacd::HaF64 (0.0f);
-		}
-		if (tN > (hacd::HaF64 (1.0f) + fractN)) {
-			ret = 0;
-		} else if (tN > (hacd::HaF64 (1.0f) - fractN)) {
-			tN = hacd::HaF64 (1.0f);
-		}
-
-		if (ret) {
-			dgBigVector p (ray_p0 + u.Scale (sN));
-			dgBigVector q (ray_q0 + v.Scale (tN));
-			dgBigVector dist (p - q);
-
-			d = dist % dist;
-			if (d > (hacd::HaF32 (16.0f) * DG_QUANTIZE_TOLERANCE * DG_QUANTIZE_TOLERANCE)) {
-				ret = 0;
-			}
-		}
-
-		p0p1 = hacd::HaF32 (sN);
-		q0q1 = hacd::HaF32 (tN);
-	}
-	return ret;
-}
-*/
-
-
-
-
 void dgMeshEffect::TransformMesh (const dgMatrix& matrix)
 {
 	dgMatrix normalMatrix (matrix);
@@ -2726,844 +2281,6 @@ void dgMeshEffect::FilterCoplanarFaces (const dgMeshEffect* const coplanarFaces,
 }
 
 
-dgMeshEffect* dgMeshEffect::Union (const dgMatrix& matrix, const dgMeshEffect* const clipMesh) const
-{
-	dgMeshEffect clipper (*clipMesh);
-	clipper.TransformMesh (matrix);
-
-	DG_MESG_EFFECT_BOOLEAN_INIT();
-
-	ClipMesh (&clipper, &leftMeshSource, &rightMeshSource, &sourceCoplanar);
-	clipper.ClipMesh (this, &leftMeshClipper, &rightMeshClipper, &clipperCoplanar);
-	if (rightMeshSource || rightMeshClipper) {
-			result = HACD_NEW(dgMeshEffect)(true);
-			result->BeginPolygon();
-
-		if (rightMeshSource) {
-			result->MergeFaces(rightMeshSource);
-	}
-
-		if (rightMeshClipper) {
-			result->MergeFaces(rightMeshClipper);
-	}
-
-		if (clipperCoplanar && sourceCoplanar) {
-			//sourceCoplanar->FilterCoplanarFaces (clipperCoplanar, hacd::HaF32 (-1.0f));
-			//result->MergeFaces(sourceCoplanar);
-			clipperCoplanar->FilterCoplanarFaces (sourceCoplanar, hacd::HaF32 (-1.0f));
-			result->MergeFaces(clipperCoplanar);
-	}
-
-		result->EndPolygon(hacd::HaF64 (1.0e-5f));
-		if (!result->GetCount()) {
-			result->Release();
-			result = NULL;
-	}
-	}
-
-	DG_MESG_EFFECT_BOOLEAN_FINISH();
-	return result;
-}
-
-dgMeshEffect* dgMeshEffect::Intersection (const dgMatrix& matrix, const dgMeshEffect* const clipMesh) const
-{
-	dgMeshEffect clipper (*clipMesh);
-	clipper.TransformMesh (matrix);
-
-	DG_MESG_EFFECT_BOOLEAN_INIT();
-
-	ClipMesh (&clipper, &leftMeshSource, &rightMeshSource, &sourceCoplanar);
-	clipper.ClipMesh (this, &leftMeshClipper, &rightMeshClipper, &clipperCoplanar);
-	if (leftMeshSource || leftMeshClipper) {
-			result = HACD_NEW(dgMeshEffect)(true);
-		result->BeginPolygon();
-
-		if (leftMeshSource) {
-			result->MergeFaces(leftMeshSource);
-	}
-
-		if (leftMeshClipper) {
-			result->MergeFaces(leftMeshClipper);
-	}
-
-		if (clipperCoplanar && sourceCoplanar) {
-			sourceCoplanar->FilterCoplanarFaces (clipperCoplanar, hacd::HaF32 (-1.0f));
-			result->MergeFaces(sourceCoplanar);
-	}
-
-		result->EndPolygon(hacd::HaF64 (1.0e-5f));
-		if (!result->GetCount()) {
-			result->Release();
-			result = NULL;
-	}
-	}
-
-	DG_MESG_EFFECT_BOOLEAN_FINISH();
-	return result;
-}
-
-
-														
-dgMeshEffect* dgMeshEffect::Difference (const dgMatrix& matrix, const dgMeshEffect* const clipMesh) const
-{
-	dgMeshEffect clipper (*clipMesh);
-	clipper.TransformMesh (matrix);
-
-	DG_MESG_EFFECT_BOOLEAN_INIT();
-
-	ClipMesh (&clipper, &leftMeshSource, &rightMeshSource, &sourceCoplanar);
-	if (rightMeshSource) {
-			result = HACD_NEW(dgMeshEffect)(true);
-			result->BeginPolygon();
-		if (rightMeshSource) {
-			result->MergeFaces(rightMeshSource);
-		}
-
-		clipper.ClipMesh (this, &leftMeshClipper, &rightMeshClipper, &clipperCoplanar);
-		if (leftMeshClipper || clipperCoplanar) {
-			if (leftMeshClipper) {
-				result->ReverseMergeFaces(leftMeshClipper);
-	}
-			if (clipperCoplanar && sourceCoplanar) {
-				HACD_ASSERT (sourceCoplanar);
-				clipperCoplanar->FilterCoplanarFaces (sourceCoplanar, hacd::HaF32 (1.0f));
-				result->ReverseMergeFaces(clipperCoplanar);
-	}
-	}
-
-		result->EndPolygon(hacd::HaF64 (1.0e-5f));
-		if (!result->GetCount()) {
-			result->Release();
-			result = NULL;
-	}
-	}
-
-	DG_MESG_EFFECT_BOOLEAN_FINISH();
-	return result;
-}
-
-
-
-
-void dgMeshEffect::ClipMesh (const dgMatrix& matrix, const dgMeshEffect* const clipMesh, dgMeshEffect** const back, dgMeshEffect** const front) const
-{
-	HACD_ASSERT (0);
-/*
-	dgMeshEffect clipper (*clipMesh);
-	clipper.TransformMesh (matrix);
-
-	dgMeshEffect* backMeshSource = NULL;
-	dgMeshEffect* frontMeshSource = NULL;
-	dgMeshEffect* backMeshClipper = NULL;
-	dgMeshEffect* frontMeshClipper = NULL;
-
-	ClipMesh (&clipper, &backMeshSource, &frontMeshSource);
-	if (backMeshSource && frontMeshSource) {
-		clipper.ClipMesh (this, &backMeshClipper, &frontMeshClipper);
-		if (backMeshSource && frontMeshSource) {
-
-			dgMeshEffect* backMesh;
-			dgMeshEffect* frontMesh;
-
-			backMesh = new (GetAllocator()) dgMeshEffect (GetAllocator(), true);
-			frontMesh = new (GetAllocator()) dgMeshEffect (GetAllocator(), true);
-
-			backMesh->BeginPolygon();
-			frontMesh->BeginPolygon();
-
-			backMesh->MergeFaces(backMeshSource);
-			backMesh->MergeFaces(backMeshClipper);
-
-			frontMesh->MergeFaces(frontMeshSource);
-			frontMesh->ReverseMergeFaces(backMeshClipper);
-
-			backMesh->EndPolygon(hacd::HaF64 (1.0e-5f));
-			frontMesh->EndPolygon(hacd::HaF64 (1.0e-5f));
-
-			*back = backMesh;
-			*front = frontMesh;
-		}
-	}
-
-	if (backMeshClipper) {
-		delete backMeshClipper;
-	}
-
-	if (frontMeshClipper) {
-		delete frontMeshClipper;
-	}
-
-	if (backMeshSource) {
-		delete backMeshSource;
-	}
-
-	if (frontMeshSource) {
-		delete frontMeshSource;
-	}
-*/
-}
-
-
-
-
-
-
-
-dgMeshEffectSolidTree* dgMeshEffect::CreateSolidTree() const
-{
-	dgMeshEffectSolidTree* tree = NULL;
-	HACD_ALWAYS_ASSERT(); // not implemented in the reduced source version
-#if 0  // UNUSED
-	hacd::HaI32 mark = IncLRU();
-	dgPolyhedra::Iterator iter (*this);
-	for (iter.Begin(); iter; iter ++){
-		dgEdge* const face = &(*iter);
-		if ((face->m_incidentFace > 0) && (face->m_mark != mark)) {
-			dgEdge* ptr = face;
-			do {
-				ptr->m_mark = mark;
-				ptr = ptr->m_next;
-			} while (ptr != face);
-
-			if (ptr->m_next->m_next->m_next == ptr) {
-				if (!tree) {
-					dgBigVector normal (FaceNormal (face, &m_points[0][0], sizeof (dgBigVector)));
-					hacd::HaF64 mag2 = normal % normal;
-					if (mag2 > hacd::HaF32 (1.0e-10f)) {
-						tree = HACD_NEW(dgMeshEffectSolidTree)(*this, face);
-					}
-				} else {
-					tree->AddFace (*this, face);
-				}
-			} else {
-				dgMeshEffect flatFace (true);
-				hacd::HaI32 count = 0;
-				dgVertexAtribute points[256];
-
-				flatFace.BeginPolygon();
-				dgEdge* ptr = face;
-				do {
-					points[count] = m_attib[ptr->m_userData];
-					count ++;
-					ptr = ptr->m_next;
-				} while (ptr != face);
-				flatFace.AddPolygon(count, &points[0].m_vertex.m_x, sizeof (dgVertexAtribute), 0);
-				flatFace.EndPolygon(hacd::HaF64 (1.0e-5f));
-
-				hacd::HaI32 flatMark = flatFace.IncLRU();
-				dgPolyhedra::Iterator flatIter (flatFace);
-				for (flatIter.Begin(); flatIter; flatIter ++){
-					dgEdge* const face = &(*flatIter);
-					if ((face->m_incidentFace > 0) && (face->m_mark != flatMark)) {
-						dgEdge* ptr = face;
-						do {
-							ptr->m_mark = flatMark;
-							ptr = ptr->m_next;
-						} while (ptr != face);
-
-						if (!tree) {
-							dgBigVector normal (flatFace.FaceNormal (face, &flatFace.m_points[0][0], sizeof (dgBigVector)));
-							hacd::HaF64 mag2 = normal % normal;
-							if (mag2 > hacd::HaF32 (1.0e-10f)) {
-								tree = HACD_NEW(dgMeshEffectSolidTree)(face);
-							}
-						} else {
-							tree->AddFace (flatFace, face);
-						}
-					}
-				}
-			}
-		}
-	}
-	HACD_ASSERT (tree);
-#endif
-	return tree;
-}
-
-void dgMeshEffect::DestroySolidTree (dgMeshEffectSolidTree* const tree)
-{
-	HACD_ALWAYS_ASSERT(); // not implemented in the reduced source version
-#if 0  // UNUSED
-
-	delete tree;
-#endif
-}
-
-
-
-void dgMeshEffect::ClipMesh (const dgMeshEffect* const clipMesh, dgMeshEffect** const left, dgMeshEffect** const right, dgMeshEffect** const coplanar) const
-{
-	HACD_ALWAYS_ASSERT(); // not implemented in the reduced source version
-#if 0  // UNUSED
-	const dgMeshEffectSolidTree* const clipper = clipMesh->CreateSolidTree();
-	HACD_ASSERT (clipper);
-	ClipMesh (clipper, left, right, coplanar);
-	delete clipper;
-#endif
-}
-
-
-bool dgMeshEffect::CheckIntersection (const dgMeshEffectSolidTree* const solidTree, hacd::HaF64 scale) const
-{
-HACD_ASSERT (0);
-return false;
-/*
-
-	if (solidTree) {
-		hacd::HaI32 mark;
-		hacd::HaI32 count;
-		dgVector center (hacd::HaF32 (0.0f), hacd::HaF32 (0.0f), hacd::HaF32 (0.0f), hacd::HaF32 (0.0f));
-
-		count = 0;
-		mark = IncLRU();
-		dgPolyhedra::Iterator iter (*this);
-		for (iter.Begin(); iter; iter ++){
-			dgEdge* face;
-			face = &(*iter);
-			if (face->m_mark != mark) {
-				dgEdge* ptr;
-				ptr = face;
-				do {
-					ptr->m_mark = mark;
-					ptr = ptr->m_twin->m_next;
-				} while (ptr != face);
-				count ++;
-				center += m_points[face->m_incidentVertex];
-			}
-		}
-		center = center.Scale (hacd::HaF32 (1.0f) / hacd::HaF32(count));
-
-		dgMatrix matrix (dgGetIdentityMatrix());
-		matrix[0][0] = scale;
-		matrix[1][1] = scale;
-		matrix[2][2] = scale;
-		matrix.m_posit = center - matrix.RotateVector(center);
-		matrix[3][3] = hacd::HaF32 (1.0f);
-
-		mark = IncLRU();
-		for (iter.Begin(); iter; iter ++){
-			dgEdge* face;
-			face = &(*iter);
-			if (face->m_incidentFace > 0) {
-				if (face->m_mark != mark) {
-
-					hacd::HaI32 stack;	
-					hacd::HaI32 frontCount;
-					hacd::HaI32 backCount;
-					dgEdge* ptr;
-					dgMeshTreeCSGFace* meshFace;
-					dgMeshTreeCSGPointsPool points;
-					dgMeshTreeCSGFace* faceOnStack[DG_MESH_EFFECT_BOLLEAN_STACK];
-					const dgMeshEffectSolidTree* stackPool[DG_MESH_EFFECT_BOLLEAN_STACK];
-
-					backCount = 0;
-					frontCount = 0;
-					meshFace = new (GetAllocator()) dgMeshTreeCSGFace(GetAllocator());
-					ptr = face;
-					do {
-						hacd::HaI32 index;
-						index = points.AddPoint (matrix.TransformVector(m_points[ptr->m_incidentVertex]));
-						meshFace->AddPoint (index);
-
-						ptr->m_mark = mark;
-						ptr = ptr->m_next;
-					} while (ptr != face);
-
-
-					stack = 1;
-					stackPool[0] = solidTree;
-					faceOnStack[0] = meshFace;
-					meshFace->AddRef();
-
-					while (stack) {
-						dgMeshTreeCSGFace* rootFace; 
-						dgMeshTreeCSGFace* backFace; 
-						dgMeshTreeCSGFace* frontFace;
-						const dgMeshEffectSolidTree* root;
-
-						stack --;
-						root = stackPool[stack];
-						rootFace = faceOnStack[stack];
-
-						ClipFace (root->m_plane, rootFace, &backFace, &frontFace, points);
-						rootFace->Release();
-
-						if (frontFace) {
-							HACD_ASSERT (frontFace->CheckConvex(this, face, points));
-
-							if (root->m_front) {
-								stackPool[stack] = root->m_front;
-								faceOnStack[stack] = frontFace;
-								stack ++;
-								HACD_ASSERT (stack < sizeof (stackPool) / sizeof (stackPool[0]));
-							} else {
-								frontFace->Release();
-								frontCount ++;
-							}
-						}
-
-						if (backFace) {
-							HACD_ASSERT (backFace->CheckConvex(this, face, points));
-							if (root->m_back) {
-								stackPool[stack] = root->m_back;
-								faceOnStack[stack] = backFace;
-								stack ++;
-								HACD_ASSERT (stack < sizeof (stackPool) / sizeof (stackPool[0]));
-							} else {
-								backFace->Release();
-								backCount ++;
-							}
-						}
-					}
-
-					meshFace->Release();
-					if (backCount) {
-						return true;
-					}
-				}
-			}
-		}
-	}
-	return false;
-*/
-}
-
-
-
-void dgMeshEffect::PlaneClipMesh (const dgMeshEffect* planeMesh, dgMeshEffect** back, dgMeshEffect** front) const
-{
-HACD_ASSERT (0);
-/*
-
-	dgEdge* face;
-	dgMeshEffect* backMesh;
-	dgMeshEffect* frontMesh;
-
-	HACD_ASSERT (planeMesh->m_isFlagFace);
-	face = &planeMesh->GetRoot()->GetInfo();
-	if (face->m_incidentFace < 0) {
-		face = face->m_twin;
-	}
-	HACD_ASSERT (face->m_incidentFace > 0);
-	dgVector normal (planeMesh->FaceNormal (face, &planeMesh->m_points[0][0], sizeof (dgVector)));
-	normal = normal.Scale (dgRsqrt (normal % normal));
-	const dgVector& point = planeMesh->m_points[face->m_incidentVertex];
-	dgPlane plane (normal, -(point % normal));
-
-	dgMeshEffect tmp (*this);
-	tmp.PlaneClipMesh (plane, left, right);
-
-//	HACD_ASSERT (tmp.CheckSingleMesh());
-
-	backMesh = *left;
-	frontMesh = *right;
-
-	if (backMesh && frontMesh) {
-		HACD_ASSERT (backMesh->GetCount());
-		HACD_ASSERT (frontMesh->GetCount());
-		if (!(backMesh->PlaneApplyCap (planeMesh, plane) && frontMesh->PlaneApplyCap (planeMesh, plane.Scale (hacd::HaF32 (-1.0f))))) {
-			backMesh->Release();
-			frontMesh->Release();
-			*left = NULL;
-			*right = NULL;
-		} else {
-			backMesh->Triangulate ();
-			frontMesh->Triangulate ();
-//			HACD_ASSERT (frontMesh->CheckSingleMesh());
-//			HACD_ASSERT (backMesh->CheckSingleMesh());
-		}
-	}
-*/
-}
-
-
-void dgMeshEffect::PlaneClipMesh (const dgMatrix& planeMatrix, const dgMatrix& planeTextMatrix, hacd::HaI32 planeMaterial, dgMeshEffect** const left, dgMeshEffect** const right) const 
-{
-	*left = NULL;
-	*right = NULL;
-
-	dgTree<dgFlatClipEdgeAttr, dgEdge*> leftFilter;
-	dgTree<dgFlatClipEdgeAttr, dgEdge*> rightFilter;
-	dgStack<hacd::HaI8> vertexSidePool(GetCount() * 2 + 256);
-	hacd::HaI8* const vertexSide = &vertexSidePool[0];
-
-	dgBigPlane plane (planeMatrix.m_front, - (planeMatrix.m_front % planeMatrix.m_posit));
-	plane = plane.Scale (hacd::HaF64 (1.0) / sqrt (plane % plane));
-
-	dgMeshEffect mesh (*this);
-
-	hacd::HaI32 backCount = 0;
-	hacd::HaI32 frontCount = 0;
-
-	
-	dgPolyhedra::Iterator iter (mesh);
-	hacd::HaI32 mark = mesh.IncLRU();
-	for (iter.Begin(); iter; iter ++){
-		dgEdge* const vertex = &(*iter);
-		if (vertex->m_mark != mark) {
-			dgEdge* ptr = vertex;
-			do {
-				ptr->m_mark = mark;
-				ptr = ptr->m_twin->m_next;
-			} while (ptr != vertex);
-
-			hacd::HaF64 test = plane.Evalue(mesh.m_points[vertex->m_incidentVertex]);
-			if (test >= hacd::HaF32 (1.0e-3f)) {
-				frontCount ++;
-				vertexSide[vertex->m_incidentVertex] = 1;
-			} else if (test <= hacd::HaF32 (-1.0e-3f)) {
-				backCount ++;
-				vertexSide[vertex->m_incidentVertex] = -2;
-			} else {
-				vertexSide[vertex->m_incidentVertex] = 0;
-			}
-			mesh.m_points[vertex->m_incidentVertex].m_w = test;
-		}
-	}
-
-	if ((frontCount == 0) || (backCount == 0)) {
-		return;
-	}
-
-	mark = mesh.IncLRU();
-	for (iter.Begin(); iter; ){
-		dgEdge* const edge = &(*iter);
-
-		iter ++;
-		if (&(*iter) == edge->m_twin) {
-			iter ++;
-		}
-
-		if (edge->m_mark != mark) {
-			edge->m_mark = mark;
-			edge->m_twin->m_mark = mark;
-			if (vertexSide[edge->m_incidentVertex] * vertexSide[edge->m_twin->m_incidentVertex] < 0) {
-
-				hacd::HaF64 test0 = mesh.m_points[edge->m_incidentVertex].m_w;
-
-				dgBigVector dp (mesh.m_points[edge->m_twin->m_incidentVertex] - mesh.m_points[edge->m_incidentVertex]);
-				hacd::HaF64 param = -test0 / (plane % dp);
-
-				dgEdge* const ptr = mesh.InsertEdgeVertex (edge, param);
-				ptr->m_mark = mark;
-				ptr->m_next->m_mark = mark;
-				ptr->m_twin->m_mark = mark;
-				ptr->m_twin->m_prev->m_mark = mark;
-
-				vertexSide[mesh.m_pointCount - 1] = 0;
-			}
-		}
-	}
-
-	mark = mesh.IncLRU();
-	for (iter.Begin(); iter; iter ++){
-		dgEdge* const face = &(*iter);
-
-
-		if ((face->m_incidentFace > 0) && (face->m_mark != mark) && (vertexSide[face->m_incidentVertex] == 0) && (vertexSide[face->m_next->m_incidentVertex] < 0)) {
-			dgEdge* ptr = face;
-			do {
-				ptr->m_mark = mark;
-				ptr = ptr->m_next;
-			} while (ptr != face);
-
-			hacd::HaI32 side = 0;
-			ptr = face->m_next;
-			do {
-				side |= vertexSide[ptr->m_incidentVertex];
-				if (vertexSide[ptr->m_incidentVertex] == 0) {
-					HACD_ASSERT (side != -1);
-					HACD_ASSERT (side <= 0);
-					if (side < 0) {
-						if (ptr->m_next != face) {
-							dgEdge* const back = mesh.AddHalfEdge(ptr->m_incidentVertex, face->m_incidentVertex);
-							dgEdge* const front = mesh.AddHalfEdge(face->m_incidentVertex, ptr->m_incidentVertex);
-							HACD_ASSERT (back);
-							HACD_ASSERT (front);
-
-							back->m_mark = mark;
-							front->m_mark = mark;
-
-							back->m_incidentFace = face->m_incidentFace;
-							front->m_incidentFace = face->m_incidentFace;
-
-							back->m_userData = ptr->m_userData;
-							front->m_userData = face->m_userData;
-
-							back->m_twin = front;
-							front->m_twin = back;
-
-							back->m_next = face;
-							front->m_next = ptr;
-
-							back->m_prev = ptr->m_prev;
-							front->m_prev = face->m_prev;
-
-							ptr->m_prev->m_next = back;
-							ptr->m_prev = front;
-
-							face->m_prev->m_next = front;
-							face->m_prev = back;
-						} else {
-							//dgEdge* const back = ptr;
-							HACD_ASSERT (ptr);
-							dgEdge* const front = ptr->m_twin;
-							HACD_ASSERT (front);
-							dgEdge* ptr1 = front;
-							do {
-								ptr1->m_mark = mark;
-								ptr1 = ptr1->m_next;
-							} while (ptr1 != front);
-						}
-					}
-					break;
-				}
-				ptr = ptr->m_next;
-
-			} while (ptr != face);
-		}
-	}
-
-	dgMeshEffect* backMesh = HACD_NEW(dgMeshEffect)(true);
-	dgMeshEffect* frontMesh = HACD_NEW(dgMeshEffect)(true);
-
-	mark = mesh.IncLRU();
-	backMesh->BeginPolygon();
-	frontMesh->BeginPolygon(); 
-	for (iter.Begin(); iter; iter ++){
-		dgEdge* const face = &(*iter);
-		if ((face->m_incidentFace > 0) && (face->m_mark != mark) && (vertexSide[face->m_incidentVertex] != 0)) {
-			dgVertexAtribute att[128];
-
-			hacd::HaI32 count = 0;
-			dgEdge* ptr = face;
-			do {
-				att[count] = mesh.m_attib[ptr->m_userData];
-				count ++;
-				ptr->m_mark = mark;
-				ptr = ptr->m_next;
-			} while (ptr != face);
-
-			if (vertexSide[face->m_incidentVertex] > 0) {
-				frontMesh->AddPolygon(count, &att[0].m_vertex.m_x, sizeof (dgVertexAtribute), dgFastInt (att[0].m_material));
-			} else {
-				backMesh->AddPolygon(count, &att[0].m_vertex.m_x, sizeof (dgVertexAtribute), dgFastInt (att[0].m_material));
-			}
-		}
-	}
-
-	backMesh->EndPolygon(hacd::HaF64 (1.0e-5f));
-	frontMesh->EndPolygon(hacd::HaF64 (1.0e-5f)); 
-
-	if (!(backMesh->GetCount() && frontMesh->GetCount())) {
-		backMesh->Release();
-		frontMesh->Release();
-		frontMesh = NULL;
-		backMesh = NULL;
-	}
-
-	if (backMesh && frontMesh) {
-		HACD_ASSERT (backMesh->GetCount());
-		HACD_ASSERT (frontMesh->GetCount());
-
-		dgBigVector min;
-		dgBigVector max;
-		CalculateAABB (min, max);
-		max -= min;
-		hacd::HaF64 size = GetMax (max.m_x, max.m_y, max.m_z);
-		dgMeshEffect planeMesh (planeMatrix, hacd::HaF32(size), hacd::HaF32(size), planeMaterial, planeTextMatrix, planeTextMatrix);
-
-		if (!(backMesh->PlaneApplyCap (&planeMesh, plane) && frontMesh->PlaneApplyCap (&planeMesh, plane.Scale (hacd::HaF32 (-1.0f))))) {
-			backMesh->Release();
-			frontMesh->Release();
-			*left = NULL;
-			*right = NULL;
-//		} else {
-//			backMesh->Triangulate ();
-//			frontMesh->Triangulate ();
-		}
-	}
-
-	*left = backMesh;
-	*right = frontMesh;
-}
-
-
-bool dgMeshEffect::CheckSingleMesh() const
-{
-HACD_ASSERT (0);
-return false;
- /*
-
-	bool ret;
-	dgPolyhedra firstSegment(GetAllocator());
-	dgPolyhedra secundSegment(GetAllocator());
-
-	dgPolyhedra::Iterator iter (*this);
-	for (iter.Begin(); iter; iter ++){
-		hacd::HaF32 err2;
-		dgEdge* vertex;
-		vertex = &(*iter);
-		if (vertex->m_incidentFace >= 0) {
-			dgVector p (m_attib[vertex->m_userData].m_vertex.m_x, m_attib[vertex->m_userData].m_vertex.m_y, m_attib[vertex->m_userData].m_vertex.m_z, hacd::HaF32 (0.0f));
-			dgVector err (m_points[vertex->m_incidentVertex] - p);
-			err2 = err % err;
-			HACD_ASSERT (err2 < hacd::HaF32 (1.0e-10f));
-		} 
-	}
-
-	BeginConectedSurface();
-	GetConectedSurface (firstSegment);
-	GetConectedSurface (secundSegment);
-	EndConectedSurface();
-	ret = (firstSegment.GetCount() > 0) & (secundSegment.GetCount() == 0);
-	return ret;
-*/
-}
-
-hacd::HaI32 dgMeshEffect::PlaneApplyCap (const dgMeshEffect* planeMesh, const dgBigPlane& faceNormal)
-{
-	dgEdge* plane = &planeMesh->GetRoot()->GetInfo();
-	if (plane->m_incidentFace < 0) {
-		plane = plane->m_twin;
-	}
-	HACD_ASSERT (plane->m_incidentFace > 0);
-
-	hacd::HaI32 ret = 0;
-	hacd::HaI32 mark = IncLRU();
-	dgPolyhedra::Iterator iter (*this);
-	for (iter.Begin(); iter; ) {
-		dgEdge* face = &(*iter);
-
-		iter++;
-
-		if ((face->m_incidentFace < 0) && (face->m_mark != mark)) {
-			hacd::HaF64 maxDist = hacd::HaF32 (0.0f);
-			dgEdge* ptr = face;
-			do {
-				maxDist = GetMax (maxDist, fabs (faceNormal.Evalue(m_points[ptr->m_incidentVertex])));
-				ptr->m_mark = mark;
-				ptr = ptr->m_next;
-			} while (ptr != face); 
-
-			if (maxDist <= hacd::HaF32 (1.5e-3f)) {
-				bool haveColinear = true;
-				ptr = face;
-				while (haveColinear) {
-					haveColinear = false;
-					do {
-						if (ptr->m_next->m_twin->m_next->m_twin != ptr) {
-							dgBigVector e0 (m_points[ptr->m_next->m_incidentVertex] - m_points[ptr->m_incidentVertex]);
-							dgBigVector e1 (m_points[ptr->m_next->m_next->m_incidentVertex] - m_points[ptr->m_next->m_incidentVertex]);
-
-							hacd::HaF64 mag00 = e0 % e0;
-							hacd::HaF64 mag11 = e1 % e1;
-							hacd::HaF64 mag01 = e0 % e1;
-
-							hacd::HaF64 epsilon = hacd::HaF64 (1.0e-6f) * mag00 * mag11;
-							hacd::HaF64 err = mag01 * mag01 - mag00 * mag11;
-							if (fabs (err) < epsilon) {
-								HACD_ASSERT (ptr->m_twin->m_incidentFace >= 0);
-
-								dgBigVector normal0 (FaceNormal(ptr->m_twin, &m_points[0].m_x, sizeof (dgBigVector)));
-								mag00 = normal0 % normal0;
-								dgEdge* ptr1 = ptr->m_twin->m_prev->m_twin;
-								do {
-									dgBigVector normal1 (FaceNormal(ptr1->m_twin, &m_points[0].m_x, sizeof (dgBigVector)));
-								
-									mag11 = normal1 % normal1;
-									mag01 = normal0 % normal1;
-									epsilon = hacd::HaF64 (1.0e-6f) * mag00 * mag11;
-									err = mag01 * mag01 - mag00 * mag11;
-									if (fabs (err) < epsilon) {
-										if (iter && ((&(*iter) == ptr1) || (&(*iter) == ptr1->m_twin))) {
-											iter --;
-										}
-										if (iter && ((&(*iter) == ptr1) || (&(*iter) == ptr1->m_twin))) {
-											iter --;
-										}
-										haveColinear = true;
-										DeleteEdge(ptr1);
-										ptr1 = ptr->m_twin;
-										
-									}
-
-									ptr1 = ptr1->m_prev->m_twin;
-
-								} while (ptr1 != ptr->m_next);
-
-								if (ptr->m_next->m_twin->m_next->m_twin == ptr) {
-									if (iter && ((&(*iter) == ptr->m_next) || (&(*iter) == ptr->m_next->m_twin))) {
-										iter --;
-										if (iter && ((&(*iter) == ptr->m_next) || (&(*iter) == ptr->m_next->m_twin))) {
-											iter --;
-										}
-									}
-
-									if (ptr->m_next == face) {
-										face = face->m_prev;
-									}
-									
-									ptr->m_twin->m_userData = ptr->m_next->m_twin->m_userData;
-									ptr->m_twin->m_incidentVertex = ptr->m_next->m_twin->m_incidentVertex;
-
-									dgEdge* const next = ptr->m_next;
-									ptr->m_next->m_next->m_prev = ptr;
-									ptr->m_next = ptr->m_next->m_next;
-									ptr->m_twin->m_prev->m_prev->m_next = ptr->m_twin;
-									ptr->m_twin->m_prev = ptr->m_twin->m_prev->m_prev;
-
-									next->m_next = next->m_twin;
-									next->m_prev = next->m_twin;
-									next->m_twin->m_next = next;
-									next->m_twin->m_prev = next;
-									DeleteEdge (next);
-
-									dgTreeNode* node = GetNodeFromInfo(*ptr);
-									dgPairKey key0 (ptr->m_incidentVertex, ptr->m_twin->m_incidentVertex);
-									if (Find(key0.GetVal())) {
-										return 0;
-									}
-									node = ReplaceKey (node, key0.GetVal());
-
-									node = GetNodeFromInfo(*ptr->m_twin);
-									dgPairKey key1 (ptr->m_twin->m_incidentVertex, ptr->m_incidentVertex);
-									if (Find(key1.GetVal())) {
-										return 0;
-									}
-									node = ReplaceKey (node, key1.GetVal());
-								}
-							}
-						}
-
-						ptr = ptr->m_next;
-					} while (ptr != face) ; 
-				}
-
-
-				ptr = face;
-				do {
-					dgVertexAtribute attrib (planeMesh->InterpolateVertex (m_points[ptr->m_incidentVertex], plane));
-					attrib.m_normal_x = faceNormal.m_x;
-					attrib.m_normal_y = faceNormal.m_y;
-					attrib.m_normal_z = faceNormal.m_z;
-
-					AddAtribute(attrib);
-
-					ptr->m_userData = m_atribCount - 1;
-					ptr->m_incidentFace = 1;
-
-					ptr = ptr->m_next;
-				} while (ptr != face); 
-//				dgVector normal;
-//				TriangulateFace (face, &m_points[0].m_x, sizeof (dgVector), normal);
-				ret = 1;
-			}
-		}
-	}
-	return ret;
-}
-
 bool dgMeshEffect::HasOpenEdges () const
 {
 	dgPolyhedra::Iterator iter (*this);
@@ -3575,51 +2292,6 @@ bool dgMeshEffect::HasOpenEdges () const
 	}
 	return false;
 }
-
-
-
-
-hacd::HaF64 dgMeshEffect::CalculateVolume () const
-{
-	HACD_ASSERT (0);
-	return 0;
-	/*
-
-	dgPolyhedraMassProperties localData;
-
-	hacd::HaI32 mark = IncLRU();
-	dgPolyhedra::Iterator iter (*this);
-	for (iter.Begin(); iter; iter ++){
-		hacd::HaI32 count;
-		dgEdge* ptr;
-		dgEdge* face;
-		dgVector points[256];
-		
-		face = &(*iter);
-		if ((face->m_incidentFace > 0) && (face->m_mark != mark)) {
-			count = 0;
-			ptr = face;
-			do {
-				points[count] = m_points[ptr->m_incidentVertex];
-				count ++;
-				ptr->m_mark = mark;
-				ptr = ptr->m_next;
-			} while (ptr != face);
-			localData.AddCGFace (count, points);
-		}
-	}
-
-	hacd::HaF32 volume;
-	dgVector p0;
-	dgVector p1;
-	dgVector com;
-	dgVector inertia;
-	dgVector crossInertia;
-	volume = localData.MassProperties (com, inertia, crossInertia);
-	return volume;
-*/
-}
-
 
 
 
@@ -3701,257 +2373,6 @@ dgMeshEffect* dgMeshEffect::GetNextLayer (hacd::HaI32 mark)
 	return solid;
 }
 
-
-void dgMeshEffect::ClipMesh (const dgMeshEffectSolidTree* const clipper, dgMeshEffect** const left, dgMeshEffect** const right, dgMeshEffect** const coplanar) const
-{
-	HACD_ALWAYS_ASSERT(); // not implemented in the reduced source version
-#if 0  // UNUSED
-
-	dgMeshEffect mesh (dgMeshEffect (*this));
-	mesh.Triangulate();
-
-	dgMeshEffect* const backMesh = HACD_NEW(dgMeshEffect)(true);
-	dgMeshEffect* const frontMesh = HACD_NEW(dgMeshEffect)(true);
-	dgMeshEffect* const meshCoplanar = HACD_NEW(dgMeshEffect)(true);
-
-	backMesh->BeginPolygon();
-	frontMesh->BeginPolygon();
-	meshCoplanar->BeginPolygon();
-
-	hacd::HaI32 mark = mesh.IncLRU();
-	dgPolyhedra::Iterator iter (mesh);
-	for (iter.Begin(); iter; iter ++) {
-		dgEdge* const face = &(*iter);
-		if ((face->m_incidentFace > 0) && (face->m_mark != mark)) {
-			dgEdge* ptr = face;
-			do {
-				ptr->m_mark = mark;
-				ptr = ptr->m_next;
-			} while (ptr != face);
-
-
-			dgList<dgMeshTreeCSGFace*> faceList;
-			dgMeshTreeCSGFace* faceOnStack[DG_MESH_EFFECT_BOLLEAN_STACK];
-			const dgMeshEffectSolidTree* stackPool[DG_MESH_EFFECT_BOLLEAN_STACK];
-			hacd::HaI32 stack = 1;
-			dgMeshTreeCSGFace* const originalFace = HACD_NEW(dgMeshTreeCSGFace)(mesh, face);
-			faceOnStack[0] = originalFace;
-			stackPool[0] = clipper;
-
-			hacd::HaI32 backCount = 0;
-			hacd::HaI32 frontCount = 0;
-			bool hasCoplanar = false;
-
-			originalFace->AddRef();
-
-
-//xxx ++;
-//dgMatrix xxxx (originalFace->DebugMatrix());
-//if (xxx == 1582) {
-//originalFace->Trace(xxxx);
-//}
-
-
-
-			while (stack) {
-
-				stack --;
-				dgMeshTreeCSGFace* const treeFace = faceOnStack[stack];
-				const dgMeshEffectSolidTree* const root = stackPool[stack];
-
-				HACD_ASSERT (root->m_planeType == dgMeshEffectSolidTree::m_divider);
-
-
-				dgMeshTreeCSGFace* backFace; 
-				dgMeshTreeCSGFace* frontFace;
-				treeFace->Clip(root->m_plane, &backFace, &frontFace);
-				treeFace->Release();
-
-				if (!(frontFace || backFace)) {
-					HACD_ASSERT (0);
-/*
-					hasCoplanar = true;
-					if (!((root->m_front->m_planeType == dgMeshEffectSolidTree::m_divider) || (root->m_back->m_planeType == dgMeshEffectSolidTree::m_divider))) {
-						HACD_ASSERT (face->DetermineSide(clipper) != 0);
-						faceList.Append(face);
-					} else {
-						//HACD_ASSERT (!(root->m_front && root->m_back));
-						if (root->m_front->m_planeType == dgMeshEffectSolidTree::m_divider) {
-							stackPool[stack] = root->m_front;
-							faceOnStack[stack] = face;
-							stack ++;
-							HACD_ASSERT (stack < hacd::HaI32 (sizeof (stackPool) / sizeof (stackPool[0])));
-						} else {
-							//if (root->m_back) {
-							HACD_ASSERT (root->m_back->m_planeType == dgMeshEffectSolidTree::m_divider);
-							stackPool[stack] = root->m_back;
-							faceOnStack[stack] = face;
-							stack ++;
-							HACD_ASSERT (stack < hacd::HaI32 (sizeof (stackPool) / sizeof (stackPool[0])));
-						}
-					}
-*/
-				} else {
-					if (frontFace) {
-						if (root->m_front->m_planeType == dgMeshEffectSolidTree::m_divider) {
-							stackPool[stack] = root->m_front;
-							faceOnStack[stack] = frontFace;
-							stack ++;
-							HACD_ASSERT (stack < hacd::HaI32 (sizeof (stackPool) / sizeof (stackPool[0])));
-						} else {
-
-//if (xxx == 485){
-//frontFace->Trace(xxxx);
-//}
-
-
-							frontCount ++;
-							frontFace->m_side = dgMeshEffectSolidTree::m_empty;
-							HACD_ASSERT (clipper->GetFaceSide(frontFace) == dgMeshEffectSolidTree::m_empty);
-							faceList.Append (frontFace);
-						}
-					}
-
-					if (backFace) {
-						if (root->m_back->m_planeType == dgMeshEffectSolidTree::m_divider) {
-							stackPool[stack] = root->m_back;
-							faceOnStack[stack] = backFace;
-							stack ++;
-							HACD_ASSERT (stack < hacd::HaI32 (sizeof (stackPool) / sizeof (stackPool[0])));
-						} else {
-
-//if (xxx == 485){
-//backFace->Trace(xxxx);
-//}
-
-							backCount ++;
-							backFace->m_side = dgMeshEffectSolidTree::m_solid;
-							HACD_ASSERT (clipper->GetFaceSide(backFace) == dgMeshEffectSolidTree::m_solid);
-							faceList.Append (backFace);
-						}
-					}
-				}
-			}
-
-			HACD_ASSERT (faceList.GetCount());
-			if (!hasCoplanar && ((backCount == 0) || (frontCount == 0))) {
-				hacd::HaI32 count = 0;
-				dgMeshEffect::dgVertexAtribute facePoints[256];
-				for (dgMeshTreeCSGFace::dgListNode* node = originalFace->GetFirst(); node; node = node->GetNext()) {
-					//facePoints[count] = node->GetInfo().GetPoint();
-					dgBigVector p (node->GetInfo().m_x.GetAproximateValue(), node->GetInfo().m_y.GetAproximateValue(), node->GetInfo().m_z.GetAproximateValue(), hacd::HaF64 (0.0));
-					facePoints[count] = mesh.InterpolateVertex(p, face);
-					facePoints[count].m_vertex = p;
-					count ++;
-				}
-
-				if (frontCount) {
-					#ifdef _DEBUG
-					for (dgList<dgMeshTreeCSGFace*>::dgListNode* node1 = faceList.GetFirst(); node1; node1 = node1->GetNext()) {
-						dgMeshTreeCSGFace* const face = node1->GetInfo();
-						HACD_ASSERT (clipper->GetFaceSide(face) == dgMeshEffectSolidTree::m_empty);
-					}
-					#endif
-					frontMesh->AddPolygon(count, &facePoints[0].m_vertex.m_x, sizeof (dgVertexAtribute), dgFastInt (facePoints[0].m_material));
-				} else {
-					#ifdef _DEBUG
-					for (dgList<dgMeshTreeCSGFace*>::dgListNode* node1 = faceList.GetFirst(); node1; node1 = node1->GetNext()) {
-						dgMeshTreeCSGFace* const face = node1->GetInfo();
-						HACD_ASSERT (clipper->GetFaceSide(face) == dgMeshEffectSolidTree::m_solid);
-					}
-					#endif
-					backMesh->AddPolygon(count, &facePoints[0].m_vertex.m_x, sizeof (dgVertexAtribute), dgFastInt (facePoints[0].m_material));
-				}
-			} else {
-
-				for (dgList<dgMeshTreeCSGFace*>::dgListNode* node = faceList.GetFirst(); node->GetNext(); node = node->GetNext()) {
-					dgMeshTreeCSGFace* const face0 = node->GetInfo();
-					for (dgList<dgMeshTreeCSGFace*>::dgListNode* node1 = node->GetNext(); node1; node1 = node1->GetNext()) {
-						dgMeshTreeCSGFace* const face1 = node1->GetInfo();
-						face0->MergeMissingVertex (face1);
-						face1->MergeMissingVertex (face0);
-					}
-				}
-
-				for (dgList<dgMeshTreeCSGFace*>::dgListNode* node1 = faceList.GetFirst(); node1; node1 = node1->GetNext()) {
-					dgMeshTreeCSGFace* const treFace = node1->GetInfo();
-
-//xxx1 ++;
-//if (xxx1 == 24310)
-//face->Trace(xxxx);
-
-					hacd::HaI32 count = 0;
-					dgVertexAtribute facePoints[256];
-					for (dgMeshTreeCSGFace::dgListNode* node = treFace->GetFirst(); node; node = node->GetNext()) {
-						dgBigVector p (node->GetInfo().m_x.GetAproximateValue(), node->GetInfo().m_y.GetAproximateValue(), node->GetInfo().m_z.GetAproximateValue(), hacd::HaF64 (0.0));
-						facePoints[count] = mesh.InterpolateVertex(p, face);
-						facePoints[count].m_vertex = p;
-						count ++;
-					}
-
-					switch (treFace->m_side) 
-					{
-						case dgMeshEffectSolidTree::m_divider:
-						{
-							HACD_ASSERT (0);
-							meshCoplanar->AddPolygon(count, &facePoints[0].m_vertex.m_x, sizeof (dgVertexAtribute), dgFastInt (facePoints[0].m_material));
-							break;
-						}
-						case dgMeshEffectSolidTree::m_solid:
-						{
-							backMesh->AddPolygon(count, &facePoints[0].m_vertex.m_x, sizeof (dgVertexAtribute), dgFastInt (facePoints[0].m_material));							
-							break;
-						}
-
-						case dgMeshEffectSolidTree::m_empty:
-						{
-							frontMesh->AddPolygon(count, &facePoints[0].m_vertex.m_x, sizeof (dgVertexAtribute), dgFastInt (facePoints[0].m_material));
-							break;
-						}
-					}
-				}
-			}
-
-			originalFace->Release();
-			for (dgList<dgMeshTreeCSGFace*>::dgListNode* node = faceList.GetFirst(); node; node = node->GetNext()) {
-				dgMeshTreeCSGFace* const face = node->GetInfo();
-				face->Release();
-			}
-		}
-	}
-
-
-	backMesh->EndPolygon(hacd::HaF64 (hacd::HaF64 (1.0e-5f)));
-	frontMesh->EndPolygon(hacd::HaF64 (hacd::HaF64 (1.0e-5f)));
-	meshCoplanar->EndPolygon(hacd::HaF64 (hacd::HaF64 (1.0e-5f)));
-
-	if (backMesh->GetCount() && frontMesh->GetCount()) {
-		*left = backMesh;
-		*right = frontMesh;
-	} else if (frontMesh->GetCount()){
-		*left = NULL;
-		*right = frontMesh;
-		backMesh->Release();
-	} else if (backMesh->GetCount()){
-		*right = NULL;
-		*left = backMesh;
-		frontMesh->Release();
-	} else {
-		HACD_ASSERT (0);
-		*right = NULL;
-		*left =  NULL;
-		backMesh->Release();
-		frontMesh->Release();
-	}
-
-	*coplanar = NULL;
-	if (meshCoplanar->GetCount()) {
-		*coplanar = meshCoplanar;
-	} else {
-		meshCoplanar->Release();
-	}
-#endif
-}
 
 void dgMeshEffect::RepairTJoints (bool triangulate)
 {
@@ -4179,4 +2600,677 @@ void dgMeshEffect::RepairTJoints (bool triangulate)
 	}
 
 	DeleteDegenerateFaces(&m_points[0].m_x, sizeof (m_points[0]), hacd::HaF64 (1.0e-7f));
+}
+
+// create a convex hull
+dgMeshEffect::dgMeshEffect (const hacd::HaF64* const vertexCloud, hacd::HaI32 count, hacd::HaI32 strideInByte, hacd::HaF64 distTol)
+:dgPolyhedra()
+{
+	Init(true);
+	if (count >= 4) {
+		dgConvexHull3d convexHull (vertexCloud, strideInByte, count, distTol);
+		if (convexHull.GetCount()) {
+
+			hacd::HaI32 vertexCount = convexHull.GetVertexCount();
+			dgStack<dgVector> pointsPool (convexHull.GetVertexCount());
+			dgVector* const points = &pointsPool[0];
+			for (hacd::HaI32 i = 0; i < vertexCount; i ++) {
+				points[i] = convexHull.GetVertex(i);
+			}
+			dgVector uv(hacd::HaF32 (0.0f), hacd::HaF32 (0.0f), hacd::HaF32 (0.0f), hacd::HaF32 (0.0f));
+			dgVector normal (hacd::HaF32 (0.0f), hacd::HaF32 (1.0f), hacd::HaF32 (0.0f), hacd::HaF32 (0.0f));
+
+			hacd::HaI32 triangleCount = convexHull.GetCount();
+			dgStack<hacd::HaI32> faceCountPool (triangleCount);
+			dgStack<hacd::HaI32> materialsPool (triangleCount);
+			dgStack<hacd::HaI32> vertexIndexListPool (triangleCount * 3);
+			dgStack<hacd::HaI32> normalIndexListPool (triangleCount * 3);
+
+
+			memset (&materialsPool[0], 0, triangleCount * sizeof (hacd::HaI32));
+			memset (&normalIndexListPool[0], 0, 3 * triangleCount * sizeof (hacd::HaI32));
+
+			hacd::HaI32 index = 0;
+			hacd::HaI32* const faceCount = &faceCountPool[0];
+			hacd::HaI32* const vertexIndexList = &vertexIndexListPool[0];
+			for (dgConvexHull3d::dgListNode* faceNode = convexHull.GetFirst(); faceNode; faceNode = faceNode->GetNext()) {
+				dgConvexHull3DFace& face = faceNode->GetInfo();
+				faceCount[index] = 3;
+				vertexIndexList[index * 3 + 0] = face.m_index[0]; 
+				vertexIndexList[index * 3 + 1] = face.m_index[1]; 
+				vertexIndexList[index * 3 + 2] = face.m_index[2]; 
+				index ++;
+			}
+
+			BuildFromVertexListIndexList(triangleCount, faceCount, &materialsPool[0], 
+				&points[0].m_x, sizeof (dgVector), vertexIndexList,
+				&normal.m_x, sizeof (dgVector), &normalIndexListPool[0],
+				&uv.m_x, sizeof (dgVector), &normalIndexListPool[0],
+				&uv.m_x, sizeof (dgVector), &normalIndexListPool[0]);
+		}
+	}
+}
+
+
+// based of the paper Hierarchical Approximate Convex Decomposition by Khaled Mamou 
+// with his permission to adapt his algorithm so be more efficient.
+// available http://sourceforge.net/projects/hacd/
+// for the details http://kmamou.blogspot.com/
+
+
+class dgClusterFace
+{
+	public:
+	dgClusterFace()
+	{
+	}
+	~dgClusterFace()
+	{
+	}
+
+	dgEdge* m_edge;
+	hacd::HaF64 m_area;
+	hacd::HaF64 m_perimeter;
+	dgBigVector m_normal;
+};
+
+class dgPairProxi
+{
+	public:
+	dgPairProxi()
+		:m_edgeA(NULL)
+		,m_edgeB(NULL)
+		,m_area(hacd::HaF64(0.0f))
+		,m_perimeter(hacd::HaF64(0.0f))
+	{
+	}
+
+	~dgPairProxi()
+	{
+	}
+
+	dgEdge* m_edgeA;
+	dgEdge* m_edgeB;
+	hacd::HaF64 m_area;
+	hacd::HaF64 m_perimeter;
+};
+
+class dgClusterList: public dgList<dgClusterFace>
+{
+	public:
+	dgClusterList() 
+		: dgList<dgClusterFace>()
+		,m_area (hacd::HaF32 (0.0f))
+		,m_perimeter (hacd::HaF32 (0.0f))
+	  {
+	  }
+
+	  ~dgClusterList()
+	  {
+	  }
+
+	  hacd::HaI32 AddVertexToPool(const dgMeshEffect& mesh, dgBigVector* const vertexPool, hacd::HaI32* const vertexMarks, hacd::HaI32 vertexMark)
+	  {
+		  hacd::HaI32 count = 0;
+
+		  const dgBigVector* const points = (dgBigVector*) mesh.GetVertexPool();
+		  for (dgListNode* node = GetFirst(); node; node = node->GetNext()) {
+			  dgClusterFace& face = node->GetInfo();
+
+			  dgEdge* edge = face.m_edge;
+			  do {
+				  hacd::HaI32 index = edge->m_incidentVertex;
+				  if (vertexMarks[index] != vertexMark)
+				  {
+					  vertexMarks[index] = vertexMark;
+					  vertexPool[count] = points[index];
+					  count++;
+				  }
+				  edge = edge->m_next;
+			  } while (edge != face.m_edge);
+		  }
+		  return count;
+	  }
+
+	  hacd::HaF64 CalculateTriangleConcavity2(const dgConvexHull3d& convexHull, dgClusterFace& info, hacd::HaI32 i0, hacd::HaI32 i1, hacd::HaI32 i2, const dgBigVector* const points) const
+	  {
+		  hacd::HaU32 head = 1;
+		  hacd::HaU32 tail = 0;
+		  dgBigVector pool[1<<8][3];
+
+		  pool[0][0] = points[i0];
+		  pool[0][1] = points[i1];
+		  pool[0][2] = points[i2];
+
+		  const dgBigVector step(info.m_normal.Scale(hacd::HaF64(4.0f) * convexHull.GetDiagonal()));
+
+		  hacd::HaF64 concavity = hacd::HaF32(0.0f);
+		  hacd::HaF64 minArea = hacd::HaF32(0.125f);
+		  hacd::HaF64 minArea2 = minArea * minArea * 0.5f;
+
+		  // weight the area by the area of the face 
+		  //dgBigVector edge10(pool[0][1] - pool[0][0]);
+		  //dgBigVector edge20(pool[0][2] - pool[0][0]);
+		  //dgBigVector triangleArea = edge10 * edge20;
+		  //hacd::HaF64 triangleArea2 = triangleArea % triangleArea;
+		  //if ((triangleArea2 / minArea2)> hacd::HaF32 (64.0f)) {
+			// minArea2 = triangleArea2 / hacd::HaF32 (64.0f);
+		  //}
+
+		  hacd::HaI32 maxCount = 4;
+		  hacd::HaU32 mask = (sizeof (pool) / (3 * sizeof (pool[0][0]))) - 1;
+		  while ((tail != head) && (maxCount >= 0)) {
+			  //stack--;
+			  maxCount --;
+			  dgBigVector p0(pool[tail][0]);
+			  dgBigVector p1(pool[tail][1]);
+			  dgBigVector p2(pool[tail][2]);
+			  tail =  (tail + 1) & mask;
+
+			  dgBigVector q1((p0 + p1 + p2).Scale(hacd::HaF64(1.0f / 3.0f)));
+			  dgBigVector q0(q1 + step);
+
+			  hacd::HaF64 param = convexHull.RayCast(q0, q1);
+			  if (param > hacd::HaF64(1.0f)) {
+				  param = hacd::HaF64(1.0f);
+			  }
+			  dgBigVector dq(step.Scale(hacd::HaF32(1.0f) - param));
+			  hacd::HaF64 lenght2 = dq % dq;
+			  if (lenght2 > concavity) {
+				  concavity = lenght2;
+			  }
+
+			  if (((head + 1) & mask) != tail) {
+				  dgBigVector edge10(p1 - p0);
+				  dgBigVector edge20(p2 - p0);
+				  dgBigVector n(edge10 * edge20);
+				  hacd::HaF64 area2 = n % n;
+				  if (area2 > minArea2) {
+					  dgBigVector p01((p0 + p1).Scale(hacd::HaF64(0.5f)));
+					  dgBigVector p12((p1 + p2).Scale(hacd::HaF64(0.5f)));
+					  dgBigVector p20((p2 + p0).Scale(hacd::HaF64(0.5f)));
+
+					  pool[head][0] = p0;
+					  pool[head][1] = p01;
+					  pool[head][2] = p20;
+					  head = (head + 1) & mask;
+
+					  if (((head + 1) & mask) != tail) {
+						  pool[head][0] = p1;
+						  pool[head][1] = p12;
+						  pool[head][2] = p01;
+						  head = (head + 1) & mask;
+
+						  if (((head + 1) & mask) != tail)	{
+							  pool[head][0] = p2;
+							  pool[head][1] = p20;
+							  pool[head][2] = p12;
+							  head = (head + 1) & mask;
+						  }
+					  }
+				  }
+			  }
+		  }
+		  return concavity;
+	  }
+
+	  hacd::HaF64 CalculateConcavity2(const dgConvexHull3d& convexHull, const dgMeshEffect& mesh)
+	  {
+		  hacd::HaF64 concavity = hacd::HaF32(0.0f);
+
+		  const dgBigVector* const points = (dgBigVector*) mesh.GetVertexPool();
+
+		  for (dgListNode* node = GetFirst(); node; node = node->GetNext()) {
+			  dgClusterFace& info = node->GetInfo();
+			  hacd::HaI32 i0 = info.m_edge->m_incidentVertex;
+			  hacd::HaI32 i1 = info.m_edge->m_next->m_incidentVertex;
+			  for (dgEdge* edge = info.m_edge->m_next->m_next; edge != info.m_edge; edge = edge->m_next) {
+				  hacd::HaI32 i2 = edge->m_incidentVertex;
+				  hacd::HaF64 val = CalculateTriangleConcavity2(convexHull, info, i0, i1, i2, points);
+				  if (val > concavity) {
+					  concavity = val;
+				  }
+				  i1 = i2;
+			  }
+		  }
+
+		  return concavity;
+	  }
+
+	  bool IsClusterCoplanar(const dgBigPlane& plane,
+		  const dgMeshEffect& mesh) const
+	  {
+		  const dgBigVector* const points = (dgBigVector*) mesh.GetVertexPool();
+		  for (dgListNode* node = GetFirst(); node; node = node->GetNext()) {
+			  dgClusterFace& info = node->GetInfo();
+
+			  dgEdge* ptr = info.m_edge;
+			  do {
+				  const dgBigVector& p = points[ptr->m_incidentVertex];
+				  hacd::HaF64 dist = fabs(plane.Evalue(p));
+				  if (dist > hacd::HaF64(1.0e-5f)) {
+					  return false;
+				  }
+				  ptr = ptr->m_next;
+			  } while (ptr != info.m_edge);
+		  }
+
+		  return true;
+	  }
+
+	  bool IsEdgeConvex(const dgBigPlane& plane, const dgMeshEffect& mesh,
+		  dgEdge* const edge) const
+	  {
+		  const dgBigVector* const points = (dgBigVector*) mesh.GetVertexPool();
+		  dgEdge* const edge0 = edge->m_next;
+		  dgEdge* ptr = edge0->m_twin->m_next;
+		  do {
+			  if (ptr->m_twin->m_incidentFace == edge->m_twin->m_incidentFace) {
+				  HACD_ASSERT(edge0->m_incidentVertex == ptr->m_incidentVertex);
+				  dgBigVector e0(points[edge0->m_twin->m_incidentVertex] - points[edge0->m_incidentVertex]);
+				  dgBigVector e1(points[ptr->m_twin->m_incidentVertex] - points[edge0->m_incidentVertex]);
+				  dgBigVector normal(e0 * e1);
+				  return (normal % plane) > hacd::HaF64(0.0f);
+			  }
+			  ptr = ptr->m_twin->m_next;
+		  } while (ptr != edge->m_twin);
+
+		  HACD_ASSERT(0);
+		  return true;
+	  }
+
+	  // calculate the convex hull of a conched group of faces,
+	  // and measure the concavity, according to Khaled convexity criteria, which is basically
+	  // has two components, 
+	  // the first is ratio  between the the perimeter of the group of faces
+	  // and the second the largest distance from any of the face to the surface of the hull 
+	  // when the faces are are a strip of a convex hull the perimeter ratio components is 1.0 and the distance to the hull is zero
+	  // this is the ideal concavity.
+	  // when the face are no part of the hull, then the worse distance to the hull is dominate the the metric
+	  // this matrix is used to place all possible combination of this cluster with any adjacent cluster into a priority heap and determine 
+	  // which pair of two adjacent cluster is the best selection for combining the into a larger cluster.
+	  void CalculateNodeCost(dgMeshEffect& mesh, hacd::HaI32 meshMask,
+		  dgBigVector* const vertexPool, hacd::HaI32* const vertexMarks,
+		  hacd::HaI32& vertexMark, dgClusterList* const clusters, hacd::HaF64 diagonalInv,
+		  hacd::HaF64 aspectRatioCoeficent, dgList<dgPairProxi>& proxyList,
+		  dgUpHeap<dgList<dgPairProxi>::dgListNode*, hacd::HaF64>& heap)
+	  {
+		  hacd::HaI32 faceIndex = GetFirst()->GetInfo().m_edge->m_incidentFace;
+
+		  const dgBigVector* const points = (dgBigVector*) mesh.GetVertexPool();
+
+		  bool flatStrip = true;
+		  dgBigPlane plane(GetFirst()->GetInfo().m_normal, -(points[GetFirst()->GetInfo().m_edge->m_incidentVertex] % GetFirst()->GetInfo().m_normal));
+		  if (GetCount() > 1) {
+			  flatStrip = IsClusterCoplanar(plane, mesh);
+		  }
+
+		  vertexMark++;
+		  hacd::HaI32 vertexCount = AddVertexToPool(mesh, vertexPool, vertexMarks, vertexMark);
+		  for (dgListNode* node = GetFirst(); node; node = node->GetNext()) {
+			  //dgClusterFace& clusterFaceA = GetFirst()->GetInfo();
+			  dgClusterFace& clusterFaceA = node->GetInfo();
+
+			  dgEdge* edge = clusterFaceA.m_edge;
+			  do {
+				  hacd::HaI32 twinFaceIndex = edge->m_twin->m_incidentFace;
+				  if ((edge->m_mark != meshMask) && (twinFaceIndex != faceIndex) && (twinFaceIndex > 0)) {
+
+					  dgClusterList& clusterListB = clusters[twinFaceIndex];
+
+					  vertexMark++;
+					  hacd::HaI32 extraCount = clusterListB.AddVertexToPool(mesh, &vertexPool[vertexCount], &vertexMarks[0], vertexMark);
+
+					  hacd::HaI32 count = vertexCount + extraCount;
+					  dgConvexHull3d convexHull(&vertexPool[0].m_x, sizeof(dgBigVector), count, 0.0);
+
+					  hacd::HaF64 concavity = hacd::HaF64(0.0f);
+					  if (convexHull.GetVertexCount()) {
+						  concavity = sqrt(GetMax(CalculateConcavity2(convexHull, mesh), clusterListB.CalculateConcavity2(convexHull, mesh)));
+						  if (concavity < hacd::HaF64(1.0e-3f)) {
+							  concavity = hacd::HaF64(0.0f);
+						  }
+					  }
+
+					  if ((concavity == hacd::HaF64(0.0f)) && flatStrip)  {
+						  if (clusterListB.IsClusterCoplanar(plane, mesh)) {
+							  bool concaveEdge = !(IsEdgeConvex(plane, mesh, edge) && IsEdgeConvex(plane, mesh, edge->m_twin));
+							  if (concaveEdge) {
+								  concavity += 1000.0f;
+							  }
+						  }
+					  }
+
+					  dgBigVector p1p0(points[edge->m_twin->m_incidentVertex] - points[edge->m_incidentVertex]);
+					  hacd::HaF64 edgeLength = hacd::HaF64(2.0f) * sqrt(p1p0 % p1p0);
+
+					  hacd::HaF64 area = m_area + clusterListB.m_area;
+					  hacd::HaF64 perimeter = m_perimeter + clusterListB.m_perimeter - edgeLength;
+					  hacd::HaF64 edgeCost = perimeter * perimeter / (hacd::HaF64(4.0f * 3.141592f) * area);
+					  hacd::HaF64 cost = diagonalInv * (concavity + edgeCost * aspectRatioCoeficent);
+
+					  if ((heap.GetCount() + 20) > heap.GetMaxCount()) {
+						  for (hacd::HaI32 i = heap.GetCount() - 1; i >= 0; i--) {
+							  dgList<dgPairProxi>::dgListNode* emptyNode = heap[i];
+							  dgPairProxi& emptyPair = emptyNode->GetInfo();
+							  if ((emptyPair.m_edgeA == NULL) && (emptyPair.m_edgeB == NULL)) {
+								  heap.Remove(i);
+							  }
+						  }
+					  }
+
+					  dgList<dgPairProxi>::dgListNode* pairNode = proxyList.Append();
+					  dgPairProxi& pair = pairNode->GetInfo();
+					  pair.m_edgeA = edge;
+					  pair.m_edgeB = edge->m_twin;
+					  pair.m_area = area;
+					  pair.m_perimeter = perimeter;
+					  edge->m_userData = hacd::HaU64(pairNode);
+					  edge->m_twin->m_userData = hacd::HaU64(pairNode);
+					  heap.Push(pairNode, cost);
+				  }
+
+				  edge->m_mark = meshMask;
+				  edge->m_twin->m_mark = meshMask;
+				  edge = edge->m_next;
+			  } while (edge != clusterFaceA.m_edge);
+		  }
+	  }
+
+
+	  hacd::HaF64 m_area;
+	  hacd::HaF64 m_perimeter;
+};
+
+dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconcavity, hacd::HaI32 maxCount) 
+	:dgPolyhedra()
+{
+	Init(true);
+
+	dgMeshEffect mesh(source);
+	hacd::HaI32 faceCount = mesh.GetTotalFaceCount() + 1;
+	dgStack<dgClusterList> clusterPool(faceCount);
+	dgClusterList* const clusters = &clusterPool[0];
+
+	for (hacd::HaI32 i = 0; i < faceCount; i++) {
+		clusters[i] = dgClusterList();
+	}
+
+	hacd::HaI32 meshMask = mesh.IncLRU();
+	const dgBigVector* const points = mesh.m_points;
+
+	// enumerate all faces, and initialize cluster pool
+	dgMeshEffect::Iterator iter(mesh);
+
+	hacd::HaI32 clusterIndex = 1;
+	for (iter.Begin(); iter; iter++) {
+		dgEdge* const edge = &(*iter);
+		edge->m_userData = hacd::HaU64 (-1);
+		if ((edge->m_mark != meshMask) && (edge->m_incidentFace > 0)) {
+			hacd::HaF64 perimeter = hacd::HaF64(0.0f);
+			dgEdge* ptr = edge;
+			do {
+				dgBigVector p1p0(points[ptr->m_incidentVertex] - points[ptr->m_prev->m_incidentVertex]);
+				perimeter += sqrt(p1p0 % p1p0);
+				ptr->m_incidentFace = clusterIndex;
+
+				ptr->m_mark = meshMask;
+				ptr = ptr->m_next;
+			} while (ptr != edge);
+
+			dgBigVector normal = mesh.FaceNormal(edge, &points[0][0], sizeof(dgBigVector));
+			hacd::HaF64 mag = sqrt(normal % normal);
+
+			dgClusterFace& faceInfo = clusters[clusterIndex].Append()->GetInfo();
+
+			faceInfo.m_edge = edge;
+			faceInfo.m_perimeter = perimeter;
+			faceInfo.m_area = hacd::HaF64(0.5f) * mag;
+			faceInfo.m_normal = normal.Scale(hacd::HaF64(1.0f) / mag);
+
+			clusters[clusterIndex].m_perimeter = perimeter;
+			clusters[clusterIndex].m_area = faceInfo.m_area;
+
+			clusterIndex++;
+		}
+	}
+
+	HACD_ASSERT(faceCount == clusterIndex);
+
+	// recalculate all edge cost
+	dgStack<hacd::HaI32> vertexMarksArray(mesh.GetVertexCount());
+	dgStack<dgBigVector> vertexArray(mesh.GetVertexCount() * 2);
+	
+	dgBigVector* const vertexPool = &vertexArray[0];
+	hacd::HaI32* const vertexMarks = &vertexMarksArray[0];
+	memset(&vertexMarks[0], 0, vertexMarksArray.GetSizeInBytes());
+
+	dgList<dgPairProxi> proxyList;
+	dgUpHeap<dgList<dgPairProxi>::dgListNode*, hacd::HaF64> heap(mesh.GetCount() + 1000);
+
+	hacd::HaI32 vertexMark = 0;
+
+	hacd::HaF64 diagonalInv = hacd::HaF32(1.0f);
+	hacd::HaF64 aspectRatioCoeficent = absoluteconcavity / hacd::HaF32(10.0f);
+	meshMask = mesh.IncLRU();
+
+	// calculate all the initial cost of all clusters, which at this time are all a single faces
+	for (hacd::HaI32 faceIndex = 1; faceIndex < faceCount; faceIndex++) {
+		vertexMark++;
+		dgClusterList& clusterList = clusters[faceIndex];
+		HACD_ASSERT(clusterList.GetFirst()->GetInfo().m_edge->m_incidentFace == faceIndex);
+		clusterList.CalculateNodeCost(mesh, meshMask, &vertexPool[0], &vertexMarks[0], vertexMark, &clusters[0], diagonalInv, aspectRatioCoeficent, proxyList, heap);
+	}
+	
+	
+	// calculate all essential convex clusters by merging the all possible clusters according 
+	// which combined concavity es lower that the max absolute concavity 
+	// select the pair with the smaller concavity and fuse then into a larger cluster
+	hacd::HaI32 essencialClustersCount = faceCount - 1;
+	while (heap.GetCount() && ((heap.Value() < absoluteconcavity) || (essencialClustersCount > maxCount))) {
+		dgList<dgPairProxi>::dgListNode* const pairNode = heap[0];
+		heap.Pop();
+		dgPairProxi& pair = pairNode->GetInfo();
+
+		HACD_ASSERT((pair.m_edgeA && pair.m_edgeA) || (!pair.m_edgeA && !pair.m_edgeA));
+		if (pair.m_edgeA && pair.m_edgeB) {
+
+			HACD_ASSERT(pair.m_edgeA->m_incidentFace != pair.m_edgeB->m_incidentFace);
+
+			// merge two clusters
+			hacd::HaI32 faceIndexA = pair.m_edgeA->m_incidentFace;
+			hacd::HaI32 faceIndexB = pair.m_edgeB->m_incidentFace;
+			dgClusterList* listA = &clusters[faceIndexA];
+			dgClusterList* listB = &clusters[faceIndexB];
+			if (pair.m_edgeA->m_incidentFace > pair.m_edgeB->m_incidentFace) {
+				Swap(faceIndexA, faceIndexB);
+				Swap(listA, listB);
+			}
+			
+			while (listB->GetFirst()) {
+				dgClusterList::dgListNode* const nodeB = listB->GetFirst();
+				listB->Unlink(nodeB);
+				dgClusterFace& faceB = nodeB->GetInfo();
+
+				dgEdge* ptr = faceB.m_edge;
+				do {
+					ptr->m_incidentFace = faceIndexA;
+					ptr = ptr->m_next;
+				} while (ptr != faceB.m_edge);
+				listA->Append(nodeB);
+			}
+			essencialClustersCount --;
+
+			listB->m_area = hacd::HaF32 (0.0f);
+			listB->m_perimeter = hacd::HaF32 (0.0f);
+			listA->m_area = pair.m_area;
+			listA->m_perimeter = pair.m_perimeter;
+
+			// recalculated the new metric for the new cluster, and tag the used cluster as invalid, so that 
+			// other potential selection do not try merge with this this one, producing convex that re use a face more than once  
+			hacd::HaI32 mark = mesh.IncLRU();
+			for (dgClusterList::dgListNode* node = listA->GetFirst(); node; node = node->GetNext()) {
+				dgClusterFace& face = node->GetInfo();
+				dgEdge* ptr = face.m_edge;
+				do {
+					if (ptr->m_userData != hacd::HaU64 (-1)) {
+						dgList<dgPairProxi>::dgListNode* const pairNode = (dgList<dgPairProxi>::dgListNode*) ptr->m_userData;
+						dgPairProxi& pairProxy = pairNode->GetInfo();
+						pairProxy.m_edgeA = NULL;
+						pairProxy.m_edgeB = NULL;
+					}
+					ptr->m_userData = hacd::HaU64 (-1);
+					ptr->m_twin->m_userData = hacd::HaU64 (-1);
+
+					if ((ptr->m_twin->m_incidentFace == faceIndexA) || (ptr->m_twin->m_incidentFace < 0)) {
+						ptr->m_mark = mark;
+						ptr->m_twin->m_mark = mark;
+					}
+
+					if (ptr->m_mark != mark) {
+						dgClusterList& adjacentList = clusters[ptr->m_twin->m_incidentFace];
+						for (dgClusterList::dgListNode* adjacentNode = adjacentList.GetFirst(); adjacentNode; adjacentNode = adjacentNode->GetNext()) {
+							dgClusterFace& adjacentFace = adjacentNode->GetInfo();
+							dgEdge* adjacentEdge = adjacentFace.m_edge;
+							do {
+								if (adjacentEdge->m_twin->m_incidentFace == faceIndexA)	{
+									adjacentEdge->m_twin->m_mark = mark;
+								}
+								adjacentEdge = adjacentEdge->m_next;
+							} while (adjacentEdge != adjacentFace.m_edge);
+						}
+						ptr->m_mark = mark - 1;
+					}
+					ptr = ptr->m_next;
+				} while (ptr != face.m_edge);
+			}
+
+			// re generated the cost of merging this new all its adjacent clusters, that are still alive. 
+			vertexMark++;
+			listA->CalculateNodeCost(mesh, mark, &vertexPool[0], &vertexMarks[0], vertexMark, &clusters[0], diagonalInv, aspectRatioCoeficent, proxyList, heap);
+		}
+
+		proxyList.Remove(pairNode);
+	}
+
+
+	// if the essential convex cluster count is larger than the the maximum specified by the user 
+	// then resuming the cluster again to the heap and start merging then by the the worse merging criteria
+	// also at this time add the distance heuristic to combine disjoint cluster as well.
+	// this is where I disagree with Khaled Mamore, he uses a brute force approach by adding extra points.
+	// I do this to the first partition and then connect disjoint face only on the perimeter
+/*
+maxCount = 1;
+	while (essencialClustersCount > maxCount) {
+
+		heap.Flush();
+		meshMask = mesh.IncLRU();
+
+		// color code each face on each cluster with it cluster index
+		for (hacd::HaI32 faceIndex = 0; faceIndex < faceCount; faceIndex++) {
+			dgClusterList& clusterList = clusters[faceIndex];
+			if (clusterList.GetCount()) {
+				for (dgClusterList::dgListNode* node = clusterList.GetFirst(); node; node = node->GetNext()) {
+					dgClusterFace& face = node->GetInfo();
+					dgEdge* ptr = face.m_edge;
+					do {
+						ptr->m_incidentFace = faceIndex;
+						ptr = ptr->m_next;
+					} while (ptr != face.m_edge);
+				}
+			}
+		}
+			
+		for (hacd::HaI32 faceIndex = 0; faceIndex < faceCount; faceIndex++) {
+			dgClusterList& clusterList = clusters[faceIndex];
+
+			// note: add the disjoint cluster criteria here, but for now just ignore
+
+			// calculate the cost again
+			if (clusterList.GetCount()) {
+
+				// note: something is wrong with my color coding that is not marking the perimeter corrently	
+
+				vertexMark++;
+				clusterList.CalculateNodeCost(mesh, meshMask, &vertexPool[0], &vertexMarks[0], vertexMark, &clusters[0], diagonalInv, aspectRatioCoeficent, proxyList, heap);	
+			}
+			
+		}
+	}
+*/
+
+
+	BeginPolygon();
+	hacd::HaF32 layer = hacd::HaF32(0.0f);
+
+	dgVertexAtribute polygon[256];
+	memset(polygon, 0, sizeof(polygon));
+	dgArray<dgBigVector> convexVertexBuffer(1024);
+	for (hacd::HaI32 i = 0; i < faceCount; i++) {
+		dgClusterList& clusterList = clusters[i];
+
+		if (clusterList.GetCount())	{
+			hacd::HaI32 count = 0;
+			for (dgClusterList::dgListNode* node = clusterList.GetFirst(); node; node = node->GetNext()) {
+				dgClusterFace& face = node->GetInfo();
+				dgEdge* edge = face.m_edge;
+
+				dgEdge* sourceEdge = source.FindEdge(edge->m_incidentVertex, edge->m_twin->m_incidentVertex);
+				do {
+					hacd::HaI32 index = edge->m_incidentVertex;
+					convexVertexBuffer[count] = points[index];
+
+					count++;
+					sourceEdge = sourceEdge->m_next;
+					edge = edge->m_next;
+				} while (edge != face.m_edge);
+			}
+
+			dgConvexHull3d convexHull(&convexVertexBuffer[0].m_x, sizeof(dgBigVector), count, 0.0);
+
+			if (convexHull.GetCount()) {
+				const dgBigVector* const vertex = convexHull.GetVertexPool();
+				for (dgConvexHull3d::dgListNode* node = convexHull.GetFirst(); node; node = node->GetNext()) {
+					const dgConvexHull3DFace* const face = &node->GetInfo();
+
+					hacd::HaI32 i0 = face->m_index[0];
+					hacd::HaI32 i1 = face->m_index[1];
+					hacd::HaI32 i2 = face->m_index[2];
+
+					polygon[0].m_vertex = vertex[i0];
+					polygon[0].m_vertex.m_w = layer;
+
+					polygon[1].m_vertex = vertex[i1];
+					polygon[1].m_vertex.m_w = layer;
+
+					polygon[2].m_vertex = vertex[i2];
+					polygon[2].m_vertex.m_w = layer;
+
+					AddPolygon(3, &polygon[0].m_vertex.m_x, sizeof(dgVertexAtribute), 0);
+				}
+
+				layer += hacd::HaF32(1.0f);
+				//break;
+			}
+		}
+	}
+	EndPolygon(1.0e-5f);
+
+	for (hacd::HaI32 i = 0; i < faceCount; i++) {
+		clusters[i].RemoveAll();
+	}
+}
+
+
+dgMeshEffect* dgMeshEffect::CreateConvexApproximation(hacd::HaF32 maxConcavity, hacd::HaI32 maxCount) const
+{
+	dgMeshEffect triangleMesh(*this);
+	if (maxCount <= 1) {
+		maxCount = 1;
+	}
+	if (maxConcavity <= hacd::HaF32 (1.0e-5f)) {
+		maxConcavity = hacd::HaF32 (1.0e-5f);
+	}
+	dgMeshEffect* const convexPartion = HACD_NEW(dgMeshEffect)(triangleMesh, maxConcavity, maxCount );
+	return convexPartion;
 }
