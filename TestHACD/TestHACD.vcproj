@@ -323,10 +323,6 @@
 					RelativePath="..\HACD\include\dgVector.h"
 					>
 				</File>
-				<File
-					RelativePath="..\HACD\include\SparseArray.h"
-					>
-				</File>
 			</Filter>
 			<Filter
 				Name="public"
@@ -349,6 +345,10 @@
 				</File>
 				<File
 					RelativePath="..\HACD\public\PxVector.h"
+					>
+				</File>
+				<File
+					RelativePath="..\HACD\public\SparseArray.h"
 					>
 				</File>
 				<File
