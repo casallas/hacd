@@ -575,7 +575,8 @@ public:
 		{
 			normalizeInput(vcount,vertices);
 			HaF32 *quantizedOutput = (HaF32 *)HACD_ALLOC( sizeof(HaF32)*3*vcount);
-			outputCount = kmeans_cluster3d(&mNormalizedInput[0].x, vcount, maxVertices, quantizedOutput, NULL, 0.01f, 0.0001f );
+			HaU32 *quantizedIndices = (HaU32 *)HACD_ALLOC( sizeof(HaU32)*vcount );
+			outputCount = kmeans_cluster3d(&mNormalizedInput[0].x, vcount, maxVertices, quantizedOutput, quantizedIndices, 0.01f, 0.0001f );
 			if ( outputCount > 0 )
 			{
 				if ( denormalizeResults )
@@ -597,9 +598,10 @@ public:
 						mQuantizedOutput.push_back(v);
 					}
 				}
-				HACD_FREE(quantizedOutput);
 				ret = &mQuantizedOutput[0].x;
 			}
+			HACD_FREE(quantizedOutput);
+			HACD_FREE(quantizedIndices);
 		}
 
 		return ret;
