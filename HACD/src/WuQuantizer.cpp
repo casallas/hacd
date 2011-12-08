@@ -1,9 +1,48 @@
-#include	<stdio.h>
-#include	<stdlib.h>
-#include	<math.h>
-#include	<float.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <float.h>
 
-#include	"WuQuantizer.h"
+#include "WuQuantizer.h"
+#include "SparseArray.h"
+
+///////////////////////////////////////////////////////////////////////
+//	    C Implementation of Wu's Color Quantizer (v. 2)
+//	    (see Graphics Gems vol. II, pp. 126-133)
+//
+// Author:	Xiaolin Wu
+// Dept. of Computer Science
+// Univ. of Western Ontario
+// London, Ontario N6A 5B7
+// wu@csd.uwo.ca
+// 
+// Algorithm: Greedy orthogonal bipartition of RGB space for variance
+// 	   minimization aided by inclusion-exclusion tricks.
+// 	   For speed no nearest neighbor search is done. Slightly
+// 	   better performance can be expected by more sophisticated
+// 	   but more expensive versions.
+// 
+// The author thanks Tom Lane at Tom_Lane@G.GP.CS.CMU.EDU for much of
+// additional documentation and a cure to a previous bug.
+// 
+// Free to distribute, comments and suggestions are appreciated.
+///////////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////
+// History
+// -------
+// July 2000:  C++ Implementation of Wu's Color Quantizer
+//             and adaptation for the FreeImage 2 Library
+//             Author: Hervé Drolon (drolon@infonie.fr)
+// March 2004: Adaptation for the FreeImage 3 library (port to big endian processors)
+//             Author: Hervé Drolon (drolon@infonie.fr)
+///////////////////////////////////////////////////////////////////////
+
+
+///////////////////////////////////////////////////////////////////////
+
+
 
 #pragma warning(disable:4100)
 
@@ -11,6 +50,520 @@ using namespace hacd;
 
 namespace HACD
 {
+
+#define FI_RGBA_RED				2
+#define FI_RGBA_GREEN			1
+#define FI_RGBA_BLUE			0
+#define FI_RGBA_ALPHA			3
+#define FI_RGBA_RED_MASK		0x00FF0000
+#define FI_RGBA_GREEN_MASK		0x0000FF00
+#define FI_RGBA_BLUE_MASK		0x000000FF
+#define FI_RGBA_ALPHA_MASK		0xFF000000
+#define FI_RGBA_RED_SHIFT		16
+#define FI_RGBA_GREEN_SHIFT		8
+#define FI_RGBA_BLUE_SHIFT		0
+#define FI_RGBA_ALPHA_SHIFT		24
+
+	////////////////////////////////////////////////////////////////
+	typedef struct tagRGBQUAD {
+		HaU8 rgbRed;
+		HaU8 rgbGreen;
+		HaU8 rgbBlue;
+		HaU8 rgbReserved;
+	} RGBQUAD;
+
+/**
+  Xiaolin Wu color quantization algorithm
+*/
+class WuColorQuantizer
+{
+public:
+	// Constructor - Input parameter: DIB 24-bit to be quantized
+	WuColorQuantizer(void);
+	// Destructor
+	~WuColorQuantizer();
+	// Quantizer - Return value: quantized 8-bit (color palette) DIB
+	void Quantize(HaI32 PaletteSize);
+
+	void addColor(HaF32 x,HaF32 y,HaF32 z);
+
+
+typedef struct tagBox 
+{
+    HaI32 r0;			 // min value, exclusive
+    HaI32 r1;			 // max value, inclusive
+    HaI32 g0;  
+    HaI32 g1;  
+    HaI32 b0;  
+    HaI32 b1;
+    HaI32 vol;
+} Box;
+
+private:
+	HaI32 table[256];
+    HaF32 *gm2;
+	HaI32 *wt, *mr, *mg, *mb;
+	void M3D(HaI32 *vwt, HaI32 *vmr, HaI32 *vmg, HaI32 *vmb, HaF32 *m2);
+	HaI32 Vol(Box *cube, HaI32 *mmt);
+	HaI32 Bottom(Box *cube, HaU8 dir, HaI32 *mmt);
+	HaI32 Top(Box *cube, HaU8 dir, HaI32 pos, HaI32 *mmt);
+	HaF32 Var(Box *cube);
+	HaF32 Maximize(Box *cube, HaU8 dir, HaI32 first, HaI32 last , HaI32 *cut,
+				   HaI32 whole_r, HaI32 whole_g, HaI32 whole_b, HaI32 whole_w);
+	bool Cut(Box *set1, Box *set2);
+	void Mark(Box *cube, HaI32 label, HaU8 *tag);
+
+};
+
+
+
+// Size of a 3D array : 33 x 33 x 33
+#define SIZE_3D	35937
+
+// 3D array indexation
+#define INDEX(r, g, b)	((r << 10) + (r << 6) + r + (g << 5) + g + b)
+
+#define MAXCOLOR	256
+
+// Constructor / Destructor
+
+WuColorQuantizer::WuColorQuantizer(void)
+{
+	// Allocate 3D arrays
+	gm2 = (HaF32*)malloc(SIZE_3D * sizeof(HaF32));
+	wt = (HaI32*)malloc(SIZE_3D * sizeof(HaI32));
+	mr = (HaI32*)malloc(SIZE_3D * sizeof(HaI32));
+	mg = (HaI32*)malloc(SIZE_3D * sizeof(HaI32));
+	mb = (HaI32*)malloc(SIZE_3D * sizeof(HaI32));
+
+	memset(gm2, 0, SIZE_3D * sizeof(HaF32));
+	memset(wt, 0, SIZE_3D * sizeof(HaI32));
+	memset(mr, 0, SIZE_3D * sizeof(HaI32));
+	memset(mg, 0, SIZE_3D * sizeof(HaI32));
+	memset(mb, 0, SIZE_3D * sizeof(HaI32));
+
+	for(HaI32 i = 0; i < 256; i++)
+		table[i] = i * i;
+
+}
+
+WuColorQuantizer::~WuColorQuantizer() 
+{
+	if(gm2)	free(gm2);
+	if(wt)	free(wt);
+	if(mr)	free(mr);
+	if(mg)	free(mg);
+	if(mb)	free(mb);
+}
+
+
+// Histogram is in elements 1..HISTSIZE along each axis,
+// element 0 is for base or marginal value
+// NB: these must start out 0!
+
+// Build 3-D color histogram of counts, r/g/b, c^2
+
+void WuColorQuantizer::addColor(HaF32 x,HaF32 y,HaF32 z)
+{
+	HaU32 red = (HaU32)(x*128+128);
+	HaU32 green = (HaU32)(y*128+128);
+	HaU32 blue = (HaU32)(z*128+128);
+	HACD_ASSERT( red < 256 );
+	HACD_ASSERT( green < 256 );
+	HACD_ASSERT( blue < 256 );
+
+	HaU32 inr = (red >> 3) + 1;
+	HaU32 ing = (green >> 3) + 1;
+	HaU32 inb = (blue >> 3) + 1;
+	HaU32 ind = INDEX(inr, ing, inb);
+ 
+	wt[ind]++;
+	mr[ind] += red;
+	mg[ind] += green;
+	mb[ind] += blue;
+	gm2[ind] += table[red] + table[green] + table[blue];
+}
+
+
+// At conclusion of the histogram step, we can interpret
+// wt[r][g][b] = sum over voxel of P(c)
+// mr[r][g][b] = sum over voxel of r*P(c)  ,  similarly for mg, mb
+// m2[r][g][b] = sum over voxel of c^2*P(c)
+// Actually each of these should be divided by 'ImageSize' to give the usual
+// interpretation of P() as ranging from 0 to 1, but we needn't do that here.
+
+
+// We now convert histogram into moments so that we can rapidly calculate
+// the sums of the above quantities over any desired box.
+
+// Compute cumulative moments
+void WuColorQuantizer::M3D(HaI32 *vwt, HaI32 *vmr, HaI32 *vmg, HaI32 *vmb, HaF32 *m2) 
+{
+	HaU32 ind1, ind2;
+	HaU8 i, r, g, b;
+	HaI32 line, line_r, line_g, line_b;
+	HaI32 area[33], area_r[33], area_g[33], area_b[33];
+	HaF32 line2, area2[33];
+
+	for(r = 1; r <= 32; r++) 
+	{
+		for(i = 0; i <= 32; i++) 
+		{
+			area2[i] = 0;
+			area[i] = area_r[i] = area_g[i] = area_b[i] = 0;
+		}
+		for(g = 1; g <= 32; g++) 
+		{
+			line2 = 0;
+			line = line_r = line_g = line_b = 0;
+			for(b = 1; b <= 32; b++) 
+			{			 
+				ind1 = INDEX(r, g, b); // [r][g][b]
+				line += vwt[ind1];
+				line_r += vmr[ind1]; 
+				line_g += vmg[ind1]; 
+				line_b += vmb[ind1];
+				line2 += m2[ind1];
+				area[b] += line;
+				area_r[b] += line_r;
+				area_g[b] += line_g;
+				area_b[b] += line_b;
+				area2[b] += line2;
+				ind2 = ind1 - 1089; // [r-1][g][b]
+				vwt[ind1] = vwt[ind2] + area[b];
+				vmr[ind1] = vmr[ind2] + area_r[b];
+				vmg[ind1] = vmg[ind2] + area_g[b];
+				vmb[ind1] = vmb[ind2] + area_b[b];
+				m2[ind1] = m2[ind2] + area2[b];
+			}
+		}
+	}
+}
+
+	// Compute sum over a box of any given statistic
+	HaI32 
+		WuColorQuantizer::Vol( Box *cube, HaI32 *mmt ) {
+			return( mmt[INDEX(cube->r1, cube->g1, cube->b1)] 
+			- mmt[INDEX(cube->r1, cube->g1, cube->b0)]
+			- mmt[INDEX(cube->r1, cube->g0, cube->b1)]
+			+ mmt[INDEX(cube->r1, cube->g0, cube->b0)]
+			- mmt[INDEX(cube->r0, cube->g1, cube->b1)]
+			+ mmt[INDEX(cube->r0, cube->g1, cube->b0)]
+			+ mmt[INDEX(cube->r0, cube->g0, cube->b1)]
+			- mmt[INDEX(cube->r0, cube->g0, cube->b0)] );
+	}
+
+	// The next two routines allow a slightly more efficient calculation
+	// of Vol() for a proposed subbox of a given box.  The sum of Top()
+	// and Bottom() is the Vol() of a subbox split in the given direction
+	// and with the specified new upper bound.
+
+
+	// Compute part of Vol(cube, mmt) that doesn't depend on r1, g1, or b1
+	// (depending on dir)
+
+	HaI32 
+		WuColorQuantizer::Bottom(Box *cube, HaU8 dir, HaI32 *mmt) {
+			switch(dir)
+			{
+			case FI_RGBA_RED:
+				return( - mmt[INDEX(cube->r0, cube->g1, cube->b1)]
+				+ mmt[INDEX(cube->r0, cube->g1, cube->b0)]
+				+ mmt[INDEX(cube->r0, cube->g0, cube->b1)]
+				- mmt[INDEX(cube->r0, cube->g0, cube->b0)] );
+				break;
+			case FI_RGBA_GREEN:
+				return( - mmt[INDEX(cube->r1, cube->g0, cube->b1)]
+				+ mmt[INDEX(cube->r1, cube->g0, cube->b0)]
+				+ mmt[INDEX(cube->r0, cube->g0, cube->b1)]
+				- mmt[INDEX(cube->r0, cube->g0, cube->b0)] );
+				break;
+			case FI_RGBA_BLUE:
+				return( - mmt[INDEX(cube->r1, cube->g1, cube->b0)]
+				+ mmt[INDEX(cube->r1, cube->g0, cube->b0)]
+				+ mmt[INDEX(cube->r0, cube->g1, cube->b0)]
+				- mmt[INDEX(cube->r0, cube->g0, cube->b0)] );
+				break;
+			}
+
+			return 0;
+	}
+
+
+	// Compute remainder of Vol(cube, mmt), substituting pos for
+	// r1, g1, or b1 (depending on dir)
+
+	HaI32 
+		WuColorQuantizer::Top(Box *cube, HaU8 dir, HaI32 pos, HaI32 *mmt) {
+			switch(dir)
+			{
+			case FI_RGBA_RED:
+				return( mmt[INDEX(pos, cube->g1, cube->b1)] 
+				-mmt[INDEX(pos, cube->g1, cube->b0)]
+				-mmt[INDEX(pos, cube->g0, cube->b1)]
+				+mmt[INDEX(pos, cube->g0, cube->b0)] );
+				break;
+			case FI_RGBA_GREEN:
+				return( mmt[INDEX(cube->r1, pos, cube->b1)] 
+				-mmt[INDEX(cube->r1, pos, cube->b0)]
+				-mmt[INDEX(cube->r0, pos, cube->b1)]
+				+mmt[INDEX(cube->r0, pos, cube->b0)] );
+				break;
+			case FI_RGBA_BLUE:
+				return( mmt[INDEX(cube->r1, cube->g1, pos)]
+				-mmt[INDEX(cube->r1, cube->g0, pos)]
+				-mmt[INDEX(cube->r0, cube->g1, pos)]
+				+mmt[INDEX(cube->r0, cube->g0, pos)] );
+				break;
+			}
+
+			return 0;
+	}
+
+	// Compute the weighted variance of a box 
+	// NB: as with the raw statistics, this is really the variance * ImageSize 
+
+	HaF32
+		WuColorQuantizer::Var(Box *cube) {
+			HaF32 dr = (HaF32) Vol(cube, mr); 
+			HaF32 dg = (HaF32) Vol(cube, mg); 
+			HaF32 db = (HaF32) Vol(cube, mb);
+			HaF32 xx =  gm2[INDEX(cube->r1, cube->g1, cube->b1)] 
+			-gm2[INDEX(cube->r1, cube->g1, cube->b0)]
+			-gm2[INDEX(cube->r1, cube->g0, cube->b1)]
+			+gm2[INDEX(cube->r1, cube->g0, cube->b0)]
+			-gm2[INDEX(cube->r0, cube->g1, cube->b1)]
+			+gm2[INDEX(cube->r0, cube->g1, cube->b0)]
+			+gm2[INDEX(cube->r0, cube->g0, cube->b1)]
+			-gm2[INDEX(cube->r0, cube->g0, cube->b0)];
+
+			return (xx - (dr*dr+dg*dg+db*db)/(HaF32)Vol(cube,wt));    
+	}
+
+	// We want to minimize the sum of the variances of two subboxes.
+	// The sum(c^2) terms can be ignored since their sum over both subboxes
+	// is the same (the sum for the whole box) no matter where we split.
+	// The remaining terms have a minus sign in the variance formula,
+	// so we drop the minus sign and MAXIMIZE the sum of the two terms.
+
+	HaF32
+		WuColorQuantizer::Maximize(Box *cube, HaU8 dir, HaI32 first, HaI32 last , HaI32 *cut, HaI32 whole_r, HaI32 whole_g, HaI32 whole_b, HaI32 whole_w) {
+			HaI32 half_r, half_g, half_b, half_w;
+			HaI32 i;
+			HaF32 temp;
+
+			HaI32 base_r = Bottom(cube, dir, mr);
+			HaI32 base_g = Bottom(cube, dir, mg);
+			HaI32 base_b = Bottom(cube, dir, mb);
+			HaI32 base_w = Bottom(cube, dir, wt);
+
+			HaF32 max = 0.0;
+
+			*cut = -1;
+
+			for (i = first; i < last; i++) {
+				half_r = base_r + Top(cube, dir, i, mr);
+				half_g = base_g + Top(cube, dir, i, mg);
+				half_b = base_b + Top(cube, dir, i, mb);
+				half_w = base_w + Top(cube, dir, i, wt);
+
+				// now half_x is sum over lower half of box, if split at i
+
+				if (half_w == 0) {		// subbox could be empty of pixels!
+					continue;			// never split into an empty box
+				} else {
+					temp = ((HaF32)half_r*half_r + (HaF32)half_g*half_g + (HaF32)half_b*half_b)/half_w;
+				}
+
+				half_r = whole_r - half_r;
+				half_g = whole_g - half_g;
+				half_b = whole_b - half_b;
+				half_w = whole_w - half_w;
+
+				if (half_w == 0) {		// subbox could be empty of pixels!
+					continue;			// never split into an empty box
+				} else {
+					temp += ((HaF32)half_r*half_r + (HaF32)half_g*half_g + (HaF32)half_b*half_b)/half_w;
+				}
+
+				if (temp > max) {
+					max=temp;
+					*cut=i;
+				}
+			}
+
+			return max;
+	}
+
+	bool
+		WuColorQuantizer::Cut(Box *set1, Box *set2) {
+			HaU8 dir;
+			HaI32 cutr, cutg, cutb;
+
+			HaI32 whole_r = Vol(set1, mr);
+			HaI32 whole_g = Vol(set1, mg);
+			HaI32 whole_b = Vol(set1, mb);
+			HaI32 whole_w = Vol(set1, wt);
+
+			HaF32 maxr = Maximize(set1, FI_RGBA_RED, set1->r0+1, set1->r1, &cutr, whole_r, whole_g, whole_b, whole_w);    
+			HaF32 maxg = Maximize(set1, FI_RGBA_GREEN, set1->g0+1, set1->g1, &cutg, whole_r, whole_g, whole_b, whole_w);    
+			HaF32 maxb = Maximize(set1, FI_RGBA_BLUE, set1->b0+1, set1->b1, &cutb, whole_r, whole_g, whole_b, whole_w);
+
+			if ((maxr >= maxg) && (maxr >= maxb)) {
+				dir = FI_RGBA_RED;
+
+				if (cutr < 0) {
+					return false; // can't split the box
+				}
+			} else if ((maxg >= maxr) && (maxg>=maxb)) {
+				dir = FI_RGBA_GREEN;
+			} else {
+				dir = FI_RGBA_BLUE;
+			}
+
+			set2->r1 = set1->r1;
+			set2->g1 = set1->g1;
+			set2->b1 = set1->b1;
+
+			switch (dir) {
+		case FI_RGBA_RED:
+			set2->r0 = set1->r1 = cutr;
+			set2->g0 = set1->g0;
+			set2->b0 = set1->b0;
+			break;
+
+		case FI_RGBA_GREEN:
+			set2->g0 = set1->g1 = cutg;
+			set2->r0 = set1->r0;
+			set2->b0 = set1->b0;
+			break;
+
+		case FI_RGBA_BLUE:
+			set2->b0 = set1->b1 = cutb;
+			set2->r0 = set1->r0;
+			set2->g0 = set1->g0;
+			break;
+			}
+
+			set1->vol = (set1->r1-set1->r0)*(set1->g1-set1->g0)*(set1->b1-set1->b0);
+			set2->vol = (set2->r1-set2->r0)*(set2->g1-set2->g0)*(set2->b1-set2->b0);
+
+			return true;
+	}
+
+
+	void
+		WuColorQuantizer::Mark(Box *cube, HaI32 label, HaU8 *tag) {
+			for (HaI32 r = cube->r0 + 1; r <= cube->r1; r++) {
+				for (HaI32 g = cube->g0 + 1; g <= cube->g1; g++) {
+					for (HaI32 b = cube->b0 + 1; b <= cube->b1; b++) {
+						tag[INDEX(r, g, b)] = (HaU8)label;
+					}
+				}
+			}
+	}
+
+	// Wu Quantization algorithm
+	void WuColorQuantizer::Quantize(HaI32 PaletteSize) 
+	{
+			HaU8 *tag = NULL;
+
+			{
+				Box	cube[MAXCOLOR];
+				HaI32	next;
+				HaI32 i, weight;
+				HaI32 k;
+				HaF32 vv[MAXCOLOR], temp;
+
+				// Compute moments
+
+				M3D(wt, mr, mg, mb, gm2);
+
+				cube[0].r0 = cube[0].g0 = cube[0].b0 = 0;
+				cube[0].r1 = cube[0].g1 = cube[0].b1 = 32;
+				next = 0;
+
+				for (i = 1; i < PaletteSize; i++) {
+					if(Cut(&cube[next], &cube[i])) {
+						// volume test ensures we won't try to cut one-cell box
+						vv[next] = (cube[next].vol > 1) ? Var(&cube[next]) : 0;
+						vv[i] = (cube[i].vol > 1) ? Var(&cube[i]) : 0;
+					} else {
+						vv[next] = 0.0;   // don't try to split this box again
+						i--;              // didn't create box i
+					}
+
+					next = 0; temp = vv[0];
+
+					for (k = 1; k <= i; k++) {
+						if (vv[k] > temp) {
+							temp = vv[k]; next = k;
+						}
+					}
+
+					if (temp <= 0.0) {
+						PaletteSize = i + 1;
+
+						// Error: "Only got 'PaletteSize' boxes"
+
+						break;
+					}
+				}
+
+				// Partition done
+
+				// the space for array gm2 can be freed now
+
+				free(gm2);
+
+				gm2 = NULL;
+
+				// Allocate a new dib
+
+
+
+				// create an optimized palette
+
+				RGBQUAD *new_pal = NULL;
+
+				tag = (HaU8*) malloc(SIZE_3D * sizeof(HaU8));
+				memset(tag, 0, SIZE_3D * sizeof(HaU8));
+
+				for (k = 0; k < PaletteSize ; k++) {
+					Mark(&cube[k], k, tag);
+					weight = Vol(&cube[k], wt);
+
+					if (weight) {
+						new_pal[k].rgbRed	= (HaU8)(((HaF32)Vol(&cube[k], mr) / (HaF32)weight) + 0.5f);
+						new_pal[k].rgbGreen = (HaU8)(((HaF32)Vol(&cube[k], mg) / (HaF32)weight) + 0.5f);
+						new_pal[k].rgbBlue	= (HaU8)(((HaF32)Vol(&cube[k], mb) / (HaF32)weight) + 0.5f);
+					} else {
+						// Error: bogus box 'k'
+
+						new_pal[k].rgbRed = new_pal[k].rgbGreen = new_pal[k].rgbBlue = 0;		
+					}
+				}
+
+#if 0
+				HaI32 npitch = FreeImage_GetPitch(new_dib);
+
+				for (HaU32 y = 0; y < height; y++) {
+					HaU8 *new_bits = FreeImage_GetBits(new_dib) + (y * npitch);
+
+					for (HaU32 x = 0; x < width; x++) {
+						new_bits[x] = tag[Qadd[y*width + x]];
+					}
+				}
+
+				// output 'new_pal' as color look-up table contents,
+				// 'new_bits' as the quantized image (array of table addresses).
+
+				free(tag);
+#endif
+			} 
+
+	}
+
 
 hacd::HaU32	kmeans_cluster3d(const hacd::HaF32 *input,				// an array of input 3d data points.
 		hacd::HaU32 inputSize,				// the number of input data points.
@@ -203,262 +756,6 @@ hacd::HaU32	kmeans_cluster3d(const hacd::HaF32 *input,				// an array of input 3
 }
 
 
-#if 0
-
-
-typedef unsigned char	byte;
-typedef unsigned int	uint;
-typedef unsigned long	ulong;
-//typedef int				bool;
-
-#ifndef True
-#define False	0
-#define True	1
-#endif
-
-//
-// RGBType is a simple 8-bit color triple
-//
-typedef struct {
-	byte    r,g,b;                      // The color
-} RGBType;
-
-//
-// OctnodeType is a generic octree node
-//
-typedef struct _octnode {
-	int     level;                      // Level for this node
-	bool    isleaf;                     // TRUE if this is a leaf node
-	byte    index;                      // Color table index
-	ulong   npixels;                    // Total pixels that have this color
-	ulong   redsum, greensum, bluesum;  // Sum of the color components
-	RGBType *color;                     // Color at this (leaf) node
-	struct _octnode *child[8];          // Tree pointers
-	struct _octnode *nextnode;          // Reducible list pointer
-} OctreeType;
-
-OctreeType *CreateOctNode(int level);
-void MakePaletteTable(OctreeType *tree, RGBType table[], int *index);
-ulong TotalLeafNodes(void);
-void ReduceTree(void);
-void InsertTree(OctreeType **tree, RGBType *color, uint depth);
-int QuantizeColor(OctreeType *tree, RGBType *color);
-
-
-
-#define		COLORBITS	8
-#define		TREEDEPTH	6
-
-byte MASK[COLORBITS] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80};
-#define BIT(b,n)    (((b)&MASK[n])>>n)
-#define LEVEL(c,d)  ((BIT((c)->r,(d)))<<2 | BIT((c)->g,(d))<<1 | BIT((c)->b,(d)))
-
-
-OctreeType  *reducelist[TREEDEPTH];             // List of reducible nodes
-
-static byte glbLeafLevel = TREEDEPTH;
-static uint glbTotalLeaves = 0;
-
-static void MakeReducible(int level, OctreeType *node);
-static OctreeType *GetReducible(void);
-
-//----------------------------------------------------------------------------
-//
-// InsertTree
-//
-// Insert a color into the octree
-//
-void InsertTree(OctreeType **tree, RGBType *color, uint depth)
-{
-//    int level;
-
-    if (*tree == (OctreeType *)NULL) {
-        *tree = CreateOctNode(depth);
-	}
-    if ((*tree)->isleaf) {
-        (*tree)->npixels++;
-        (*tree)->redsum += color->r;
-        (*tree)->greensum += color->g;
-        (*tree)->bluesum += color->b;
-	}
-	else {
-		InsertTree(&((*tree)->child[LEVEL(color, TREEDEPTH-depth)]),
-				   color,
-				   depth+1);
-	}
-}
-
-
-
-//--------------------------------------------------------------------------
-//
-// ReduceTree
-//
-// Combines all the children of a node into the parent, makes the parent
-// into a leaf
-//
-void ReduceTree()
-{
-	OctreeType  *node;
-	ulong   sumred=0, sumgreen=0, sumblue=0;
-	byte    i, nchild=0;
-
-	node = GetReducible();
-    for (i = 0; i < COLORBITS; i++) {
-		if (node->child[i]) {
-			nchild++;
-			sumred += node->child[i]->redsum;
-			sumgreen += node->child[i]->greensum;
-			sumblue += node->child[i]->bluesum;
-			node->npixels += node->child[i]->npixels;
-			free(node->child[i]);
-		}
-	}
-	node->isleaf = True;
-	node->redsum = sumred;
-	node->greensum = sumgreen;
-	node->bluesum = sumblue;
-    glbTotalLeaves -= (nchild - 1);
-}
-
-
-
-
-//--------------------------------------------------------------------------
-//
-// CreateOctNode
-//
-// Allocates and initializes a new octree node.  The level of the node is
-// determined by the caller.
-//
-// Arguments:
-//  level   int     Tree level where the node will be inserted.
-//
-// Returns:
-//  Pointer to newly allocated node.  Does not return on failure.
-//
-OctreeType *CreateOctNode(int level)
-{
-	static OctreeType  *newnode;
-    int                 i;
-
-    newnode = (OctreeType *)HACD_ALLOC(sizeof(OctreeType));
-    newnode->level = level;
-	newnode->isleaf = level == glbLeafLevel;
-    if (newnode->isleaf) {
-        glbTotalLeaves++;
-    }
-    else {
-        MakeReducible(level, newnode);
-    }
-    newnode->npixels = 0;
-	newnode->index = 0;
-    newnode->npixels = 0;
-	newnode->redsum = newnode->greensum = newnode->bluesum = 0L;
-    for (i = 0; i < COLORBITS; i++) {
-        newnode->child[i] = NULL;
-	}
-	return newnode;
-}
-
-
-//-----------------------------------------------------------------------
-//
-// MakeReducible
-//
-// Adds a node to the reducible list for the specified level
-//
-static void MakeReducible(int level, OctreeType *node)
-{
-    node->nextnode = reducelist[level];
-    reducelist[level] = node;
-}
-
-
-//-----------------------------------------------------------------------
-//
-// GetReducible
-//
-// Returns the next available reducible node at the tree's leaf level
-//
-static OctreeType *GetReducible(void)
-{
-    OctreeType *node;
-    
-    while (reducelist[glbLeafLevel-1] == NULL) {
-        glbLeafLevel--;
-    }
-    node = reducelist[glbLeafLevel-1];
-    reducelist[glbLeafLevel-1] = reducelist[glbLeafLevel-1]->nextnode;
-	return node;
-}
-
-
-
-//---------------------------------------------------------------------------
-//
-// MakePaletteTable
-//
-// Given a color octree, traverse the tree and do the following:
-//	- Add the averaged RGB leaf color to the color palette table;
-//	- Store the palette table index in the tree;
-//
-// When this recursive function finally returns, 'index' will contain
-// the total number of colors in the palette table.
-//
-void MakePaletteTable(OctreeType *tree, RGBType table[], int *index)
-{
-	int	i;
-
-	if (tree->isleaf) {
-		table[*index].r = (byte)(tree->redsum / tree->npixels);
-        table[*index].g = (byte)(tree->greensum / tree->npixels);
-        table[*index].b = (byte)(tree->bluesum / tree->npixels);
-		tree->index = (byte)*index;
-		(*index)++;
-	}
-	else {
-        for (i = 0; i < COLORBITS; i++) {
-			if (tree->child[i]) {
-				MakePaletteTable(tree->child[i], table, index);
-			}
-		}
-	}
-}
-
-
-//---------------------------------------------------------------------------
-//
-// QuantizeColor
-//
-// Returns the palette table index of an RGB color by traversing the
-// octree to the leaf level
-//
-int QuantizeColor(OctreeType *tree, RGBType *color)
-{
-	if (tree->isleaf) {
-		return tree->index;
-	}
-	else {
-        QuantizeColor(tree->child[LEVEL(color,6-tree->level)],color);
-	}
-	return 0;
-}
-
-
-
-//---------------------------------------------------------------------------
-//
-// TotalLeafNodes
-//
-// Returns the total leaves in the tree (glbTotalLeaves)
-//
-ulong TotalLeafNodes()
-{
-	return glbTotalLeaves;
-}
-#endif
-
 
 #define MAX_OCTREE_DEPTH 6
 
@@ -492,47 +789,12 @@ public:
 		HaF32	z;
 	};
 
-    class OctreeNode : public UserAllocated
-    {
-    public:
-    	OctreeNode(HaU32 level)
-    	{
-    		mLevel 		= level;
-    		mIsLeaf		= level==MAX_OCTREE_DEPTH;
-    		mVertCount	= 0;
-    		mSumX		= 0;
-    		mSumY		= 0;
-    		mSumZ		= 0;
-    		mValue		= Vec3(0,0,0);
-    		for (HaU32 i=0; i<8; i++)
-    		{
-    		    mChildren[i] = NULL;
-    		}
-    		mNextNode = NULL;
-    	}
-    	bool		mIsLeaf;			// whether or  not this is a leaf node.
-    	HaU32		mLevel;				// level of the octree node. High bit indicates it is a leaf node.
-    	HaU32		mVertCount;			// number of vertices with this value.
-    	HaU32		mSumX;				// total sum of quantized X axis value.
-    	HaU32		mSumY;				// total sum of quantized Y axis value.
-    	HaU32		mSumZ;				// total sum of quantized Z axis value.
-    	Vec3		mValue;			// resultant value.
-    	OctreeNode	*mChildren[8];		// the 8 children.
-    	OctreeNode	*mNextNode;			// reducible list pointer.
-    };
-
-
-
 	typedef STDNAME::vector< Vec3 > Vec3Vector;
 
 	MyWuQuantizer(void)
 	{
 		mScale = Vec3(1,1,1);
 		mCenter = Vec3(0,0,0);
-		for (HaU32 i=0; i<MAX_OCTREE_DEPTH; i++)
-		{
-			mReduceList[i] = NULL;
-		}
 	}
 
 	// use the Wu quantizer with 10 bits of resolution on each axis.  Precision down to 0.0009765625
@@ -549,12 +811,15 @@ public:
 
 		normalizeInput(vcount,vertices);
 
-		//
-		for (HaU32 i=0; i<MAX_OCTREE_DEPTH; i++)
+		WuColorQuantizer wcq;
+
+		for (HaU32 i=0; i<vcount; i++)
 		{
-			mReduceList[i] = NULL;
+			const Vec3 &v = mNormalizedInput[i];
+			wcq.addColor(v.x,v.y,v.z);
 		}
 
+		wcq.Quantize(maxVertices);
 
 		return ret;
 	}
@@ -729,9 +994,6 @@ private:
 	Vec3		mCenter;
 	Vec3Vector	mNormalizedInput;
 	Vec3Vector	mQuantizedOutput;
-
-	OctreeNode	*mReduceList[MAX_OCTREE_DEPTH];
-
 };
 
 WuQuantizer * createWuQuantizer(void)

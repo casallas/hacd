@@ -125,7 +125,10 @@ bool  HullLibrary::NormalizeAndCleanupVertices(hacd::HaU32 svcount,
 	WuQuantizer *wq = createWuQuantizer();
 	if ( wq )
 	{
+
 		const hacd::HaF32 *quantizedVertices = wq->kmeansQuantize3D(svcount,svertices,false,maxVertices,vcount);
+//		const hacd::HaF32 *quantizedVertices = wq->wuQuantize3D(svcount,svertices,false,maxVertices,vcount);
+
 		if ( quantizedVertices )
 		{
 			memcpy(vertices,quantizedVertices,sizeof(HaF32)*3*vcount);

@@ -127,25 +127,6 @@ static HaF32  fm_computeMeshVolume(const HaF32 *vertices,HaU32 tcount,const HaU3
 			return fm_intersectAABB(mMin,mMax, h.mMin, h.mMax );
 		}
 
-		void getCenter(HaF32 *center) const
-		{
-			center[0] = (mMin[0] + mMax[0])*0.5f;
-			center[1] = (mMin[1] + mMax[1])*0.5f;
-			center[2] = (mMin[2] + mMax[2])*0.5f;
-		}
-
-		HaF32 distanceSquared(const CHull &h) const
-		{
-			HaF32 center1[3];
-			HaF32 center2[3];
-			getCenter(center1);
-			h.getCenter(center2);
-			HaF32 dx = center1[0] = center2[0];
-			HaF32 dy = center1[1] = center2[1];
-			HaF32 dz = center1[2] = center2[2];
-			return dx*dx+dy*dy+dz*dz;
-		}
-
 		HaU32			mGuid;
 		hacd::HaF32		mMin[3];
 		hacd::HaF32		mMax[3];
@@ -195,12 +176,6 @@ public:
 		HaU32 count = (HaU32)inputHulls.size();
 		mHasBeenTested = HACD_NEW(TestedMap)(count*count);
 
-		HaU32 maxMergeCount=0;
-		if ( maxMergeCount < inputHulls.size() )
-		{
-			maxMergeCount = (HaU32)inputHulls.size() - mergeHullCount;
-		}
-
 		mTotalVolume = 0;
 		for (HaU32 i=0; i<inputHulls.size(); i++)
 		{
@@ -210,7 +185,7 @@ public:
 			mTotalVolume+=ch->mVolume;
 		}
 
-		for (HaU32 i=0; i<maxMergeCount; i++)
+		while ( (HaU32)mChulls.size() > mergeHullCount )
 		{
 			bool combined = combineHulls(); // mege smallest hulls first, up to the max merge count.
 			if ( !combined ) break;
@@ -379,32 +354,6 @@ public:
 				delete mergeB;
 			}
 			mChulls = output;
-#if 0
-			static HaU32 mergeCount=0;
-			mergeCount++;
-			char scratch[512];
-			sprintf_s(scratch,512,"Merge%03d.obj", mergeCount );
-			FILE *fph = fopen(scratch,"wb");
-			HaU32 baseVertex = 1;
-			for (HaU32 i=0; i<mChulls.size(); i++)
-			{
-				CHull *h = mChulls[i];
-				for (HaU32 i=0; i<h->mVertexCount; i++)
-				{
-					const HaF32 *p = &h->mVertices[i*3];
-					fprintf(fph,"v %0.9f %0.9f %0.9f\r\n", p[0], p[1], p[2] );
-				}
-				for (HaU32 i=0; i<h->mTriangleCount; i++)
-				{
-					HaU32 i1 = h->mIndices[i*3+0];
-					HaU32 i2 = h->mIndices[i*3+1];
-					HaU32 i3 = h->mIndices[i*3+2];
-					fprintf(fph,"f %d %d %d\r\n", i1+baseVertex, i2+baseVertex, i3+baseVertex );
-				}
-				baseVertex+=h->mVertexCount;
-			}
-			fclose(fph);
-#endif
 		}
 
 		return combine;
