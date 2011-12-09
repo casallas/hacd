@@ -28,7 +28,7 @@ template<class T>
 class dgList 
 {
 	public:
-	class dgListNode : public hacd::UserAllocated
+	class dgListNode : public UANS::UserAllocated
 	{
 		dgListNode (dgListNode* const prev, dgListNode* const next) 
 			:m_info () 

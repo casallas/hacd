@@ -69,7 +69,7 @@ class dgEdge
 };
 
 
-class dgPolyhedra: public dgTree <dgEdge, dgEdgeKey>, public hacd::UserAllocated
+class dgPolyhedra: public dgTree <dgEdge, dgEdgeKey>, public UANS::UserAllocated
 {
 	public:
 

@@ -118,24 +118,9 @@ namespace hacd
 
 }; // end HACD namespace
 
-#define USE_STL 0 // set to 1 to use the standard template library for all code; if off it uses high performance custom containers which trap all memory allocations.
 #define UANS hacd	// the user allocator namespace
-#define USE_CONSTRAINT_BUILDER 1
-
-#if USE_STL
-
-#include <map>
-#include <set>
-#include <vector>
-#define STDNAME std
-
-#else
 
 #include "PxVector.h"
-
-#define STDNAME hacd
-
-#endif
 
 
 

@@ -27,7 +27,7 @@
 // Note: this is a low level class for dgTree use only
 // unpredictable result will happen if you attempt to manipulate
 // any member of this class
-class dgRedBackNode : public hacd::UserAllocated
+class dgRedBackNode : public UANS::UserAllocated
 {
 	public:
 	enum REDBLACK_COLOR

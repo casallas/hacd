@@ -16,7 +16,7 @@ public:
 	const hacd::HaU32	*mIndices;
 };
 
-typedef STDNAME::vector< MergeHull > MergeHullVector;
+typedef hacd::vector< MergeHull > MergeHullVector;
 
 class MergeHullsInterface
 {

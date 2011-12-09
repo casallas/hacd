@@ -49,7 +49,7 @@ class dgConvexHull3DFace
 
 class dgHullVertex;
 
-class dgConvexHull3d: public dgList<dgConvexHull3DFace>, public hacd::UserAllocated
+class dgConvexHull3d: public dgList<dgConvexHull3DFace>, public UANS::UserAllocated
 {
 	public:
 	dgConvexHull3d(const hacd::HaF64* const vertexCloud, hacd::HaI32 strideInBytes, hacd::HaI32 count, hacd::HaF64 distTol, hacd::HaI32 maxVertexCount = 0x7fffffff);

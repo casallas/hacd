@@ -88,7 +88,7 @@ static HaF32  fm_computeMeshVolume(const HaF32 *vertices,HaU32 tcount,const HaU3
 
 
 
-	class CHull : public UserAllocated
+class CHull : public UANS::UserAllocated
 	{
 	public:
 		CHull(HaU32 vcount,const HaF32 *vertices,HaU32 tcount,const HaU32 *indices,HaU32 guid)
@@ -151,9 +151,9 @@ static HaF32  fm_computeMeshVolume(const HaF32 *vertices,HaU32 tcount,const HaU3
 
 
 
-typedef STDNAME::vector< CHull * > CHullVector;
+typedef hacd::vector< CHull * > CHullVector;
 
-class MyMergeHullsInterface : public MergeHullsInterface, public hacd::UserAllocated
+class MyMergeHullsInterface : public MergeHullsInterface, public UANS::UserAllocated
 {
 public:
 	MyMergeHullsInterface(void)

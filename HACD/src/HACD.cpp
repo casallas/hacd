@@ -210,7 +210,7 @@ public:
 	}
 
 private:
-	STDNAME::vector< Hull >	mHulls;
+	hacd::vector< Hull >	mHulls;
 };
 
 HACD_API * createHACD_API(void)

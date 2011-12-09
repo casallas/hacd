@@ -92,7 +92,7 @@ public:
 	HaF32	z;
 };
 
-	typedef STDNAME::vector< Vec3 > Vec3Vector;
+	typedef hacd::vector< Vec3 > Vec3Vector;
 
 
 /**
@@ -769,7 +769,7 @@ hacd::HaU32	kmeans_cluster3d(const hacd::HaF32 *input,				// an array of input 3
 	return kmeans_cluster< Vec3d<hacd::HaF32>, hacd::HaF32 >(_input,inputSize,clumpCount,_output,outputIndices,errorThreshold,collapseDistance);
 }
 
-class MyWuQuantizer : public WuQuantizer, public hacd::UserAllocated
+class MyWuQuantizer : public WuQuantizer, public UANS::UserAllocated
 {
 public:
 	MyWuQuantizer(void)

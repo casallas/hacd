@@ -14,7 +14,7 @@ using namespace hacd;
 
 
 template < class Value,	size_t hashTableSize = 512 >		// *MUST* be a power of 2!
-class SparseArray : public UserAllocated
+class SparseArray : public UANS::UserAllocated
 {
 public:
 	SparseArray(HaU32 maxEntries)
@@ -160,7 +160,7 @@ private:
 		return ret & (hashTableSize - 1);
 	}
 
-	class HashEntry : public UserAllocated
+	class HashEntry : public UANS::UserAllocated
 	{
 	public:
 		HashEntry(void)
