@@ -26,7 +26,7 @@ HullError HullLibrary::CreateConvexHull(const HullDesc       &desc,           //
 	hacd::HaF32 center[3];
 
 	hacd::HaU32 ovcount;
-	bool ok = NormalizeAndCleanupVertices(desc.mVcount,desc.mVertices, desc.mVertexStride, ovcount, vsource, desc.mNormalEpsilon, scale, center, desc.mMaxVertices*2 ); // normalize point cloud, remove duplicates!
+	bool ok = NormalizeAndCleanupVertices(desc.mVcount,desc.mVertices, desc.mVertexStride, ovcount, vsource, desc.mNormalEpsilon, scale, center, desc.mMaxVertices*2, desc.mUseWuQuantizer ); // normalize point cloud, remove duplicates!
 	if ( ok )
 	{
 		HaF64 *bigVertices = (HaF64 *)HACD_ALLOC(sizeof(HaF64)*3*ovcount);
@@ -118,17 +118,23 @@ bool  HullLibrary::NormalizeAndCleanupVertices(hacd::HaU32 svcount,
 									hacd::HaF32  normalepsilon,
 									hacd::HaF32 *scale,
 									hacd::HaF32 *center,
-									hacd::HaU32 maxVertices)
+									hacd::HaU32 maxVertices,
+									bool useWuQuantizer)
 {
 	bool ret = false;
 
 	WuQuantizer *wq = createWuQuantizer();
 	if ( wq )
 	{
-
-		const hacd::HaF32 *quantizedVertices = wq->kmeansQuantize3D(svcount,svertices,false,maxVertices,vcount);
-//		const hacd::HaF32 *quantizedVertices = wq->wuQuantize3D(svcount,svertices,false,maxVertices,vcount);
-
+		const HaF32 *quantizedVertices;
+		if ( useWuQuantizer )
+		{
+			quantizedVertices = wq->wuQuantize3D(svcount,svertices,false,maxVertices,vcount);
+		}
+		else
+		{
+			quantizedVertices = wq->kmeansQuantize3D(svcount,svertices,false,maxVertices,vcount);
+		}
 		if ( quantizedVertices )
 		{
 			memcpy(vertices,quantizedVertices,sizeof(HaF32)*3*vcount);

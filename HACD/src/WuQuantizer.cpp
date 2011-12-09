@@ -72,6 +72,36 @@ namespace HACD
 		HaU8 rgbReserved;
 	} RGBQUAD;
 
+	class Vec3
+	{
+	public:
+
+		Vec3(HaF32 _x,HaF32 _y,HaF32 _z)
+		{
+			x = _x;
+			y = _y;
+			z = _z;
+		}
+
+		Vec3(void)
+		{
+		}
+
+		Vec3(const hacd::HaF32 *p)
+		{
+			x = p[0];
+			y = p[1];
+			z = p[2];
+		}
+
+		HaF32	x;
+		HaF32	y;
+		HaF32	z;
+	};
+
+	typedef STDNAME::vector< Vec3 > Vec3Vector;
+
+
 /**
   Xiaolin Wu color quantization algorithm
 */
@@ -83,7 +113,7 @@ public:
 	// Destructor
 	~WuColorQuantizer();
 	// Quantizer - Return value: quantized 8-bit (color palette) DIB
-	void Quantize(HaI32 PaletteSize);
+	void Quantize(HaI32 PaletteSize,Vec3Vector &outputVertices);
 
 	void addColor(HaF32 x,HaF32 y,HaF32 z);
 
@@ -123,7 +153,7 @@ private:
 // 3D array indexation
 #define INDEX(r, g, b)	((r << 10) + (r << 6) + r + (g << 5) + g + b)
 
-#define MAXCOLOR	256
+#define MAXCOLOR	1024
 
 // Constructor / Destructor
 
@@ -463,106 +493,93 @@ void WuColorQuantizer::M3D(HaI32 *vwt, HaI32 *vmr, HaI32 *vmg, HaI32 *vmb, HaF32
 			}
 	}
 
-	// Wu Quantization algorithm
-	void WuColorQuantizer::Quantize(HaI32 PaletteSize) 
+// Wu Quantization algorithm
+void WuColorQuantizer::Quantize(HaI32 PaletteSize,Vec3Vector &outputVertices) 
+{
+	HaU8 *tag = NULL;
+
+	if ( PaletteSize > MAXCOLOR )
 	{
-			HaU8 *tag = NULL;
-
-			{
-				Box	cube[MAXCOLOR];
-				HaI32	next;
-				HaI32 i, weight;
-				HaI32 k;
-				HaF32 vv[MAXCOLOR], temp;
-
-				// Compute moments
-
-				M3D(wt, mr, mg, mb, gm2);
-
-				cube[0].r0 = cube[0].g0 = cube[0].b0 = 0;
-				cube[0].r1 = cube[0].g1 = cube[0].b1 = 32;
-				next = 0;
-
-				for (i = 1; i < PaletteSize; i++) {
-					if(Cut(&cube[next], &cube[i])) {
-						// volume test ensures we won't try to cut one-cell box
-						vv[next] = (cube[next].vol > 1) ? Var(&cube[next]) : 0;
-						vv[i] = (cube[i].vol > 1) ? Var(&cube[i]) : 0;
-					} else {
-						vv[next] = 0.0;   // don't try to split this box again
-						i--;              // didn't create box i
-					}
-
-					next = 0; temp = vv[0];
-
-					for (k = 1; k <= i; k++) {
-						if (vv[k] > temp) {
-							temp = vv[k]; next = k;
-						}
-					}
-
-					if (temp <= 0.0) {
-						PaletteSize = i + 1;
-
-						// Error: "Only got 'PaletteSize' boxes"
-
-						break;
-					}
-				}
-
-				// Partition done
-
-				// the space for array gm2 can be freed now
-
-				free(gm2);
-
-				gm2 = NULL;
-
-				// Allocate a new dib
-
-
-
-				// create an optimized palette
-
-				RGBQUAD *new_pal = NULL;
-
-				tag = (HaU8*) malloc(SIZE_3D * sizeof(HaU8));
-				memset(tag, 0, SIZE_3D * sizeof(HaU8));
-
-				for (k = 0; k < PaletteSize ; k++) {
-					Mark(&cube[k], k, tag);
-					weight = Vol(&cube[k], wt);
-
-					if (weight) {
-						new_pal[k].rgbRed	= (HaU8)(((HaF32)Vol(&cube[k], mr) / (HaF32)weight) + 0.5f);
-						new_pal[k].rgbGreen = (HaU8)(((HaF32)Vol(&cube[k], mg) / (HaF32)weight) + 0.5f);
-						new_pal[k].rgbBlue	= (HaU8)(((HaF32)Vol(&cube[k], mb) / (HaF32)weight) + 0.5f);
-					} else {
-						// Error: bogus box 'k'
-
-						new_pal[k].rgbRed = new_pal[k].rgbGreen = new_pal[k].rgbBlue = 0;		
-					}
-				}
-
-#if 0
-				HaI32 npitch = FreeImage_GetPitch(new_dib);
-
-				for (HaU32 y = 0; y < height; y++) {
-					HaU8 *new_bits = FreeImage_GetBits(new_dib) + (y * npitch);
-
-					for (HaU32 x = 0; x < width; x++) {
-						new_bits[x] = tag[Qadd[y*width + x]];
-					}
-				}
-
-				// output 'new_pal' as color look-up table contents,
-				// 'new_bits' as the quantized image (array of table addresses).
-
-				free(tag);
-#endif
-			} 
-
+		PaletteSize = MAXCOLOR;
 	}
+	Box	cube[MAXCOLOR];
+	HaI32	next;
+	HaI32 i, weight;
+	HaI32 k;
+	HaF32 vv[MAXCOLOR], temp;
+
+	// Compute moments
+	M3D(wt, mr, mg, mb, gm2);
+
+	cube[0].r0 = cube[0].g0 = cube[0].b0 = 0;
+	cube[0].r1 = cube[0].g1 = cube[0].b1 = 32;
+	next = 0;
+
+	for (i = 1; i < PaletteSize; i++) 
+	{
+		if(Cut(&cube[next], &cube[i])) 
+		{
+			// volume test ensures we won't try to cut one-cell box
+			vv[next] = (cube[next].vol > 1) ? Var(&cube[next]) : 0;
+			vv[i] = (cube[i].vol > 1) ? Var(&cube[i]) : 0;
+		} 
+		else 
+		{
+			vv[next] = 0.0;   // don't try to split this box again
+			i--;              // didn't create box i
+		}
+
+		next = 0; temp = vv[0];
+
+		for (k = 1; k <= i; k++) 
+		{
+			if (vv[k] > temp) 
+			{
+				temp = vv[k]; next = k;
+			}
+		}
+
+		if (temp <= 0.0) 
+		{
+			PaletteSize = i + 1;
+			// Error: "Only got 'PaletteSize' boxes"
+			break;
+		}
+	}
+
+	// Partition done
+	// the space for array gm2 can be freed now
+	free(gm2);
+	gm2 = NULL;
+
+	// create an optimized palette
+	tag = (HaU8*) malloc(SIZE_3D * sizeof(HaU8));
+	memset(tag, 0, SIZE_3D * sizeof(HaU8));
+
+	for (k = 0; k < PaletteSize ; k++) 
+	{
+		Mark(&cube[k], k, tag);
+		weight = Vol(&cube[k], wt);
+
+		if (weight) 
+		{
+			HaI32 red	= (HaI32)(((HaF32)Vol(&cube[k], mr) / (HaF32)weight) + 0.5f);
+			HaI32 green = (HaI32)(((HaF32)Vol(&cube[k], mg) / (HaF32)weight) + 0.5f);
+			HaI32 blue	= (HaI32)(((HaF32)Vol(&cube[k], mb) / (HaF32)weight) + 0.5f);
+			HACD_ASSERT( red >= 0 && red < 256 );
+			HACD_ASSERT( green >= 0 && green < 256 );
+			HACD_ASSERT( blue >= 0 && blue < 256 );
+			Vec3 v;
+			v.x = (red-128.0f)/128.0f;
+			v.y = (green-128.0f)/128.0f;
+			v.z = (blue-128.0f)/128.0f;
+			outputVertices.push_back(v);
+		} 
+		else 
+		{
+		}
+	}
+}
 
 
 hacd::HaU32	kmeans_cluster3d(const hacd::HaF32 *input,				// an array of input 3d data points.
@@ -762,35 +779,6 @@ hacd::HaU32	kmeans_cluster3d(const hacd::HaF32 *input,				// an array of input 3
 class MyWuQuantizer : public WuQuantizer, public hacd::UserAllocated
 {
 public:
-	class Vec3
-	{
-	public:
-
-		Vec3(HaF32 _x,HaF32 _y,HaF32 _z)
-		{
-			x = _x;
-			y = _y;
-			z = _z;
-		}
-
-		Vec3(void)
-		{
-		}
-
-		Vec3(const hacd::HaF32 *p)
-		{
-			x = p[0];
-			y = p[1];
-			z = p[2];
-		}
-
-		HaF32	x;
-		HaF32	y;
-		HaF32	z;
-	};
-
-	typedef STDNAME::vector< Vec3 > Vec3Vector;
-
 	MyWuQuantizer(void)
 	{
 		mScale = Vec3(1,1,1);
@@ -819,7 +807,26 @@ public:
 			wcq.addColor(v.x,v.y,v.z);
 		}
 
-		wcq.Quantize(maxVertices);
+		wcq.Quantize(maxVertices,mQuantizedOutput);
+
+		outputCount = (HaU32)mQuantizedOutput.size();
+
+		if ( outputCount > 0 )
+		{
+			if ( denormalizeResults )
+			{
+				for (HaU32 i=0; i<outputCount; i++)
+				{
+					Vec3 &v = mQuantizedOutput[i];
+					v.x = v.x*mScale.x + mCenter.x;
+					v.y = v.x*mScale.y + mCenter.y;
+					v.z = v.x*mScale.z + mCenter.z;
+					mQuantizedOutput.push_back(v);
+				}
+			}
+			ret = &mQuantizedOutput[0].x;
+		}
+
 
 		return ret;
 	}

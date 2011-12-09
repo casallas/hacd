@@ -35,8 +35,9 @@ public:
 		mVertices       = 0;
 		mVertexStride   = sizeof(hacd::HaF32)*3;
 		mNormalEpsilon  = 0.001f;
-		mMaxVertices = 4096; // maximum number of points to be considered for a convex hull.
+		mMaxVertices = 256; // maximum number of points to be considered for a convex hull.
 		mSkinWidth = 0.0f; // default is one centimeter
+		mUseWuQuantizer = true;
 	};
 
 	HullDesc(hacd::HaU32 vcount,
@@ -51,6 +52,7 @@ public:
 		mSkinWidth = 0.01f; // default is one centimeter
 	}
 
+	bool				mUseWuQuantizer;		// if True, uses the WuQuantizer to clean-up the input point cloud.  Of false, it uses Kmeans clustering.  More accurate but slower.
 	hacd::HaU32			mVcount;          // number of vertices in the input point cloud
 	const hacd::HaF32	*mVertices;        // the array of vertices.
 	hacd::HaU32			mVertexStride;    // the stride of each vertex, in bytes.
@@ -107,7 +109,8 @@ private:
 							hacd::HaF32  normalepsilon,
 							hacd::HaF32 *scale,
 							hacd::HaF32 *center,
-							hacd::HaU32 maxVertices);
+							hacd::HaU32 maxVertices,
+							bool useWuQuantizer);
 };
 
 }; // end of namespace HACD
