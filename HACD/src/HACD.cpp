@@ -54,7 +54,7 @@ public:
 					uv,sizeof(hacd::HaF32)*2,dummyIndex,
 					uv,sizeof(hacd::HaF32)*2,dummyIndex);
 
-				dgMeshEffect *result = mesh.CreateConvexApproximation(desc.mConcavity,desc.mMaxHullCount*4);
+				dgMeshEffect *result = mesh.CreateConvexApproximation(desc.mConcavity,desc.mMaxHullCount);
 
 				if ( result )
 				{
@@ -122,7 +122,7 @@ public:
 			}
 		}
 
-		if ( ret && ret > desc.mMaxHullCount )
+		if ( ret && ret > desc.mMaxMergeHullCount )
 		{
 			MergeHullsInterface *mhi = createMergeHullsInterface();
 			if ( mhi )
@@ -140,7 +140,7 @@ public:
 					inputHulls.push_back(mh);
 				}
 
-				ret = mhi->mergeHulls(inputHulls,outputHulls,desc.mMaxHullCount);
+				ret = mhi->mergeHulls(inputHulls,outputHulls,desc.mMaxMergeHullCount);
 
 				for (HaU32 i=0; i<ret; i++)
 				{

@@ -25,6 +25,7 @@ public:
 		const hacd::HaF32	*mVertices;
 		const hacd::HaU32	*mIndices;
 		hacd::HaU32			mMaxHullCount;
+		hacd::HaU32			mMaxMergeHullCount;
 		hacd::HaU32			mMaxHullVertices;
 		hacd::HaF32			mConcavity;
 		void init(void)
@@ -34,6 +35,7 @@ public:
 			mVertices = NULL;
 			mIndices = NULL;
 			mMaxHullCount = 256;
+			mMaxMergeHullCount = 256;
 			mMaxHullVertices = 64;
 			mConcavity = 0.2f;
 		}

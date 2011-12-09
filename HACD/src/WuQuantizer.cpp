@@ -64,40 +64,33 @@ namespace HACD
 #define FI_RGBA_BLUE_SHIFT		0
 #define FI_RGBA_ALPHA_SHIFT		24
 
-	////////////////////////////////////////////////////////////////
-	typedef struct tagRGBQUAD {
-		HaU8 rgbRed;
-		HaU8 rgbGreen;
-		HaU8 rgbBlue;
-		HaU8 rgbReserved;
-	} RGBQUAD;
+////////////////////////////////////////////////////////////////
+class Vec3
+{
+public:
 
-	class Vec3
+	Vec3(HaF32 _x,HaF32 _y,HaF32 _z)
 	{
-	public:
+		x = _x;
+		y = _y;
+		z = _z;
+	}
 
-		Vec3(HaF32 _x,HaF32 _y,HaF32 _z)
-		{
-			x = _x;
-			y = _y;
-			z = _z;
-		}
+	Vec3(void)
+	{
+	}
 
-		Vec3(void)
-		{
-		}
+	Vec3(const hacd::HaF32 *p)
+	{
+		x = p[0];
+		y = p[1];
+		z = p[2];
+	}
 
-		Vec3(const hacd::HaF32 *p)
-		{
-			x = p[0];
-			y = p[1];
-			z = p[2];
-		}
-
-		HaF32	x;
-		HaF32	y;
-		HaF32	z;
-	};
+	HaF32	x;
+	HaF32	y;
+	HaF32	z;
+};
 
 	typedef STDNAME::vector< Vec3 > Vec3Vector;
 
@@ -131,8 +124,12 @@ typedef struct tagBox
 
 private:
 	HaI32 table[256];
-    HaF32 *gm2;
-	HaI32 *wt, *mr, *mg, *mb;
+    HaF32 *mSumSquared;
+	HaI32 *mWeight;
+	HaI32 *mSumX;
+	HaI32 *mSumY;
+	HaI32 *mSumZ;
+
 	void M3D(HaI32 *vwt, HaI32 *vmr, HaI32 *vmg, HaI32 *vmb, HaF32 *m2);
 	HaI32 Vol(Box *cube, HaI32 *mmt);
 	HaI32 Bottom(Box *cube, HaU8 dir, HaI32 *mmt);
@@ -160,17 +157,17 @@ private:
 WuColorQuantizer::WuColorQuantizer(void)
 {
 	// Allocate 3D arrays
-	gm2 = (HaF32*)malloc(SIZE_3D * sizeof(HaF32));
-	wt = (HaI32*)malloc(SIZE_3D * sizeof(HaI32));
-	mr = (HaI32*)malloc(SIZE_3D * sizeof(HaI32));
-	mg = (HaI32*)malloc(SIZE_3D * sizeof(HaI32));
-	mb = (HaI32*)malloc(SIZE_3D * sizeof(HaI32));
+	mSumSquared = (HaF32*)malloc(SIZE_3D * sizeof(HaF32));
+	mWeight = (HaI32*)malloc(SIZE_3D * sizeof(HaI32));
+	mSumX = (HaI32*)malloc(SIZE_3D * sizeof(HaI32));
+	mSumY = (HaI32*)malloc(SIZE_3D * sizeof(HaI32));
+	mSumZ = (HaI32*)malloc(SIZE_3D * sizeof(HaI32));
 
-	memset(gm2, 0, SIZE_3D * sizeof(HaF32));
-	memset(wt, 0, SIZE_3D * sizeof(HaI32));
-	memset(mr, 0, SIZE_3D * sizeof(HaI32));
-	memset(mg, 0, SIZE_3D * sizeof(HaI32));
-	memset(mb, 0, SIZE_3D * sizeof(HaI32));
+	memset(mSumSquared, 0, SIZE_3D * sizeof(HaF32));
+	memset(mWeight, 0, SIZE_3D * sizeof(HaI32));
+	memset(mSumX, 0, SIZE_3D * sizeof(HaI32));
+	memset(mSumY, 0, SIZE_3D * sizeof(HaI32));
+	memset(mSumZ, 0, SIZE_3D * sizeof(HaI32));
 
 	for(HaI32 i = 0; i < 256; i++)
 		table[i] = i * i;
@@ -179,11 +176,11 @@ WuColorQuantizer::WuColorQuantizer(void)
 
 WuColorQuantizer::~WuColorQuantizer() 
 {
-	if(gm2)	free(gm2);
-	if(wt)	free(wt);
-	if(mr)	free(mr);
-	if(mg)	free(mg);
-	if(mb)	free(mb);
+	if(mSumSquared)	free(mSumSquared);
+	if(mWeight)	free(mWeight);
+	if(mSumX)	free(mSumX);
+	if(mSumY)	free(mSumY);
+	if(mSumZ)	free(mSumZ);
 }
 
 
@@ -207,17 +204,17 @@ void WuColorQuantizer::addColor(HaF32 x,HaF32 y,HaF32 z)
 	HaU32 inb = (blue >> 3) + 1;
 	HaU32 ind = INDEX(inr, ing, inb);
  
-	wt[ind]++;
-	mr[ind] += red;
-	mg[ind] += green;
-	mb[ind] += blue;
-	gm2[ind] += table[red] + table[green] + table[blue];
+	mWeight[ind]++;
+	mSumX[ind] += red;
+	mSumY[ind] += green;
+	mSumZ[ind] += blue;
+	mSumSquared[ind] += table[red] + table[green] + table[blue];
 }
 
 
 // At conclusion of the histogram step, we can interpret
-// wt[r][g][b] = sum over voxel of P(c)
-// mr[r][g][b] = sum over voxel of r*P(c)  ,  similarly for mg, mb
+// mWeight[r][g][b] = sum over voxel of P(c)
+// mSumX[r][g][b] = sum over voxel of r*P(c)  ,  similarly for mSumY, mSumZ
 // m2[r][g][b] = sum over voxel of c^2*P(c)
 // Actually each of these should be divided by 'ImageSize' to give the usual
 // interpretation of P() as ranging from 0 to 1, but we needn't do that here.
@@ -323,8 +320,8 @@ void WuColorQuantizer::M3D(HaI32 *vwt, HaI32 *vmr, HaI32 *vmg, HaI32 *vmb, HaF32
 	// Compute remainder of Vol(cube, mmt), substituting pos for
 	// r1, g1, or b1 (depending on dir)
 
-	HaI32 
-		WuColorQuantizer::Top(Box *cube, HaU8 dir, HaI32 pos, HaI32 *mmt) {
+	HaI32 	WuColorQuantizer::Top(Box *cube, HaU8 dir, HaI32 pos, HaI32 *mmt) 
+	{
 			switch(dir)
 			{
 			case FI_RGBA_RED:
@@ -353,21 +350,21 @@ void WuColorQuantizer::M3D(HaI32 *vwt, HaI32 *vmr, HaI32 *vmg, HaI32 *vmb, HaF32
 	// Compute the weighted variance of a box 
 	// NB: as with the raw statistics, this is really the variance * ImageSize 
 
-	HaF32
-		WuColorQuantizer::Var(Box *cube) {
-			HaF32 dr = (HaF32) Vol(cube, mr); 
-			HaF32 dg = (HaF32) Vol(cube, mg); 
-			HaF32 db = (HaF32) Vol(cube, mb);
-			HaF32 xx =  gm2[INDEX(cube->r1, cube->g1, cube->b1)] 
-			-gm2[INDEX(cube->r1, cube->g1, cube->b0)]
-			-gm2[INDEX(cube->r1, cube->g0, cube->b1)]
-			+gm2[INDEX(cube->r1, cube->g0, cube->b0)]
-			-gm2[INDEX(cube->r0, cube->g1, cube->b1)]
-			+gm2[INDEX(cube->r0, cube->g1, cube->b0)]
-			+gm2[INDEX(cube->r0, cube->g0, cube->b1)]
-			-gm2[INDEX(cube->r0, cube->g0, cube->b0)];
+	HaF32	WuColorQuantizer::Var(Box *cube) 
+	{
+		HaF32 dr = (HaF32) Vol(cube, mSumX); 
+		HaF32 dg = (HaF32) Vol(cube, mSumY); 
+		HaF32 db = (HaF32) Vol(cube, mSumZ);
+		HaF32 xx =  mSumSquared[INDEX(cube->r1, cube->g1, cube->b1)] 
+			-mSumSquared[INDEX(cube->r1, cube->g1, cube->b0)]
+			-mSumSquared[INDEX(cube->r1, cube->g0, cube->b1)]
+			+mSumSquared[INDEX(cube->r1, cube->g0, cube->b0)]
+			-mSumSquared[INDEX(cube->r0, cube->g1, cube->b1)]
+			+mSumSquared[INDEX(cube->r0, cube->g1, cube->b0)]
+			+mSumSquared[INDEX(cube->r0, cube->g0, cube->b1)]
+			-mSumSquared[INDEX(cube->r0, cube->g0, cube->b0)];
 
-			return (xx - (dr*dr+dg*dg+db*db)/(HaF32)Vol(cube,wt));    
+		return (xx - (dr*dr+dg*dg+db*db)/(HaF32)Vol(cube,mWeight));    
 	}
 
 	// We want to minimize the sum of the variances of two subboxes.
@@ -376,26 +373,26 @@ void WuColorQuantizer::M3D(HaI32 *vwt, HaI32 *vmr, HaI32 *vmg, HaI32 *vmb, HaF32
 	// The remaining terms have a minus sign in the variance formula,
 	// so we drop the minus sign and MAXIMIZE the sum of the two terms.
 
-	HaF32
-		WuColorQuantizer::Maximize(Box *cube, HaU8 dir, HaI32 first, HaI32 last , HaI32 *cut, HaI32 whole_r, HaI32 whole_g, HaI32 whole_b, HaI32 whole_w) {
+	HaF32	WuColorQuantizer::Maximize(Box *cube, HaU8 dir, HaI32 first, HaI32 last , HaI32 *cut, HaI32 whole_r, HaI32 whole_g, HaI32 whole_b, HaI32 whole_w) 
+	{
 			HaI32 half_r, half_g, half_b, half_w;
 			HaI32 i;
 			HaF32 temp;
 
-			HaI32 base_r = Bottom(cube, dir, mr);
-			HaI32 base_g = Bottom(cube, dir, mg);
-			HaI32 base_b = Bottom(cube, dir, mb);
-			HaI32 base_w = Bottom(cube, dir, wt);
+			HaI32 base_r = Bottom(cube, dir, mSumX);
+			HaI32 base_g = Bottom(cube, dir, mSumY);
+			HaI32 base_b = Bottom(cube, dir, mSumZ);
+			HaI32 base_w = Bottom(cube, dir, mWeight);
 
 			HaF32 max = 0.0;
 
 			*cut = -1;
 
 			for (i = first; i < last; i++) {
-				half_r = base_r + Top(cube, dir, i, mr);
-				half_g = base_g + Top(cube, dir, i, mg);
-				half_b = base_b + Top(cube, dir, i, mb);
-				half_w = base_w + Top(cube, dir, i, wt);
+				half_r = base_r + Top(cube, dir, i, mSumX);
+				half_g = base_g + Top(cube, dir, i, mSumY);
+				half_b = base_b + Top(cube, dir, i, mSumZ);
+				half_w = base_w + Top(cube, dir, i, mWeight);
 
 				// now half_x is sum over lower half of box, if split at i
 
@@ -430,10 +427,10 @@ void WuColorQuantizer::M3D(HaI32 *vwt, HaI32 *vmr, HaI32 *vmg, HaI32 *vmb, HaF32
 			HaU8 dir;
 			HaI32 cutr, cutg, cutb;
 
-			HaI32 whole_r = Vol(set1, mr);
-			HaI32 whole_g = Vol(set1, mg);
-			HaI32 whole_b = Vol(set1, mb);
-			HaI32 whole_w = Vol(set1, wt);
+			HaI32 whole_r = Vol(set1, mSumX);
+			HaI32 whole_g = Vol(set1, mSumY);
+			HaI32 whole_b = Vol(set1, mSumZ);
+			HaI32 whole_w = Vol(set1, mWeight);
 
 			HaF32 maxr = Maximize(set1, FI_RGBA_RED, set1->r0+1, set1->r1, &cutr, whole_r, whole_g, whole_b, whole_w);    
 			HaF32 maxg = Maximize(set1, FI_RGBA_GREEN, set1->g0+1, set1->g1, &cutg, whole_r, whole_g, whole_b, whole_w);    
@@ -509,7 +506,7 @@ void WuColorQuantizer::Quantize(HaI32 PaletteSize,Vec3Vector &outputVertices)
 	HaF32 vv[MAXCOLOR], temp;
 
 	// Compute moments
-	M3D(wt, mr, mg, mb, gm2);
+	M3D(mWeight, mSumX, mSumY, mSumZ, mSumSquared);
 
 	cube[0].r0 = cube[0].g0 = cube[0].b0 = 0;
 	cube[0].r1 = cube[0].g1 = cube[0].b1 = 32;
@@ -548,9 +545,9 @@ void WuColorQuantizer::Quantize(HaI32 PaletteSize,Vec3Vector &outputVertices)
 	}
 
 	// Partition done
-	// the space for array gm2 can be freed now
-	free(gm2);
-	gm2 = NULL;
+	// the space for array mSumSquared can be freed now
+	free(mSumSquared);
+	mSumSquared = NULL;
 
 	// create an optimized palette
 	tag = (HaU8*) malloc(SIZE_3D * sizeof(HaU8));
@@ -559,13 +556,13 @@ void WuColorQuantizer::Quantize(HaI32 PaletteSize,Vec3Vector &outputVertices)
 	for (k = 0; k < PaletteSize ; k++) 
 	{
 		Mark(&cube[k], k, tag);
-		weight = Vol(&cube[k], wt);
+		weight = Vol(&cube[k], mWeight);
 
 		if (weight) 
 		{
-			HaI32 red	= (HaI32)(((HaF32)Vol(&cube[k], mr) / (HaF32)weight) + 0.5f);
-			HaI32 green = (HaI32)(((HaF32)Vol(&cube[k], mg) / (HaF32)weight) + 0.5f);
-			HaI32 blue	= (HaI32)(((HaF32)Vol(&cube[k], mb) / (HaF32)weight) + 0.5f);
+			HaI32 red	= (HaI32)(((HaF32)Vol(&cube[k], mSumX) / (HaF32)weight) + 0.5f);
+			HaI32 green = (HaI32)(((HaF32)Vol(&cube[k], mSumY) / (HaF32)weight) + 0.5f);
+			HaI32 blue	= (HaI32)(((HaF32)Vol(&cube[k], mSumZ) / (HaF32)weight) + 0.5f);
 			HACD_ASSERT( red >= 0 && red < 256 );
 			HACD_ASSERT( green >= 0 && green < 256 );
 			HACD_ASSERT( blue >= 0 && blue < 256 );
@@ -771,10 +768,6 @@ hacd::HaU32	kmeans_cluster3d(const hacd::HaF32 *input,				// an array of input 3
 	Vec3d<hacd::HaF32> *_output = (Vec3d<hacd::HaF32> *)outputClusters;
 	return kmeans_cluster< Vec3d<hacd::HaF32>, hacd::HaF32 >(_input,inputSize,clumpCount,_output,outputIndices,errorThreshold,collapseDistance);
 }
-
-
-
-#define MAX_OCTREE_DEPTH 6
 
 class MyWuQuantizer : public WuQuantizer, public hacd::UserAllocated
 {
