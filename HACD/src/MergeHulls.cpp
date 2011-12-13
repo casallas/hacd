@@ -153,7 +153,7 @@ class CHull : public UANS::UserAllocated
 
 typedef hacd::vector< CHull * > CHullVector;
 
-class MyMergeHullsInterface : public MergeHullsInterface, public UANS::UserAllocated
+class MyMergeHullsInterface : public MergeHullsInterface, public hacd::UserAllocated
 {
 public:
 	MyMergeHullsInterface(void)
@@ -169,12 +169,17 @@ public:
 	// Merge these input hulls.
 	virtual hacd::HaU32 mergeHulls(const MergeHullVector &inputHulls,
 		MergeHullVector &outputHulls,
-		hacd::HaU32 mergeHullCount)
+		hacd::HaU32 mergeHullCount,
+		hacd::HaF32 smallClusterThreshold,
+		hacd::HaU32 maxHullVertices)
 	{
 		mGuid = 0;
 
 		HaU32 count = (HaU32)inputHulls.size();
 		mHasBeenTested = HACD_NEW(TestedMap)(count*count);
+		mSmallClusterThreshold = smallClusterThreshold;
+		mMaxHullVertices = maxHullVertices;
+		mMergeNumHulls = mergeHullCount;
 
 		mTotalVolume = 0;
 		for (HaU32 i=0; i<inputHulls.size(); i++)
@@ -185,11 +190,11 @@ public:
 			mTotalVolume+=ch->mVolume;
 		}
 
-		while ( (HaU32)mChulls.size() > mergeHullCount )
+		for(;;)
 		{
 			bool combined = combineHulls(); // mege smallest hulls first, up to the max merge count.
 			if ( !combined ) break;
-		}
+		} 
 
 		// return results..
 		for (HaU32 i=0; i<mChulls.size(); i++)
@@ -273,6 +278,7 @@ public:
 		desc.mVcount       = combinedVertexCount;
 		desc.mVertices     = combinedVertices;
 		desc.mVertexStride = sizeof(hacd::HaF32)*3;
+		desc.mMaxVertices = mMaxHullVertices;
 		HullError hret = hl.CreateConvexHull(desc,hresult);
 		HACD_ASSERT( hret == QE_OK );
 		if ( hret == QE_OK )
@@ -295,8 +301,14 @@ public:
 		CHull *mergeA = NULL;
 		CHull *mergeB = NULL;
 
+		// Early out to save walking all the hulls. Hulls are combined based on 
+		// a target number or on a number of generated hulls.
+		bool mergeTargetMet = (HaU32)mChulls.size() <= mMergeNumHulls;
+		if (mergeTargetMet && (mSmallClusterThreshold == 0.0f))
+			return false;
+		
+		HaF32 bestVolume = mTotalVolume;
 		{
-			HaF32 bestVolume = mTotalVolume;
 			for (HaU32 i=0; i<count; i++)
 			{
 				CHull *cr = mChulls[i];
@@ -335,9 +347,16 @@ public:
 				}
 			}
 		}
-		if ( mergeA )
+
+		// If we found a merge pair, and we are below the merge threshold or we haven't reduced to the target
+		// do the merge.
+		bool thresholdBelow = ((bestVolume / mTotalVolume) * 100.0f) < mSmallClusterThreshold;
+		if ( mergeA && (thresholdBelow || !mergeTargetMet))
 		{
 			CHull *merge = doMerge(mergeA,mergeB);
+
+			HaF32 volumeA = mergeA->mVolume;
+			HaF32 volumeB = mergeB->mVolume;
 			if ( merge )
 			{
 				combine = true;
@@ -352,6 +371,10 @@ public:
 				}
 				delete mergeA;
 				delete mergeB;
+
+				// Remove the old volumes and add the new one.
+				mTotalVolume -= (volumeA + volumeB);
+				mTotalVolume += merge->mVolume;
 			}
 			mChulls = output;
 		}
@@ -363,6 +386,9 @@ private:
 	TestedMap			*mHasBeenTested;
 	HaU32				mGuid;
 	HaF32				mTotalVolume;
+	HaF32				mSmallClusterThreshold;
+	HaU32				mMergeNumHulls;
+	HaU32				mMaxHullVertices;
 	CHullVector			mChulls;
 };
 

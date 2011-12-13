@@ -122,7 +122,8 @@ public:
 			}
 		}
 
-		if ( ret && ret > desc.mMaxMergeHullCount )
+		if ( ret && ((ret > desc.mMaxMergeHullCount) || 
+			(desc.mSmallClusterThreshold != 0.0f)) )
 		{
 			MergeHullsInterface *mhi = createMergeHullsInterface();
 			if ( mhi )
@@ -140,7 +141,7 @@ public:
 					inputHulls.push_back(mh);
 				}
 
-				ret = mhi->mergeHulls(inputHulls,outputHulls,desc.mMaxMergeHullCount);
+				ret = mhi->mergeHulls(inputHulls,outputHulls,desc.mMaxMergeHullCount, desc.mSmallClusterThreshold + FLT_EPSILON, desc.mMaxHullVertices);
 
 				for (HaU32 i=0; i<ret; i++)
 				{

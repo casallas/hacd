@@ -24,7 +24,9 @@ public:
 	// Merge these input hulls.
 	virtual hacd::HaU32 mergeHulls(const MergeHullVector &inputHulls,
 									MergeHullVector &outputHulls,
-									hacd::HaU32	mergeHullCount) = 0;
+									hacd::HaU32	mergeHullCount,
+									hacd::HaF32 smallClusterThreshold,
+									hacd::HaU32 maxHullVertices) = 0;
 
 
 	virtual void release(void) = 0;

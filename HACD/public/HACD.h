@@ -28,6 +28,7 @@ public:
 		hacd::HaU32			mMaxMergeHullCount;
 		hacd::HaU32			mMaxHullVertices;
 		hacd::HaF32			mConcavity;
+		hacd::HaF32			mSmallClusterThreshold;
 		void init(void)
 		{
 			mTriangleCount = 0;
@@ -38,6 +39,7 @@ public:
 			mMaxMergeHullCount = 256;
 			mMaxHullVertices = 64;
 			mConcavity = 0.2f;
+			mSmallClusterThreshold = 0.0f;
 		}
 	};
 

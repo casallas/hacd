@@ -54,6 +54,7 @@ void main(int argc,const char ** argv)
 		printf("-v	<count>	: Max Hull Vertices (default 64)\r\n");
 		printf("-m	<count>	: Maximum number of hulls output from HACD (default 256)\r\n");
 		printf("-merge <count> : Maximum number of hulls after merging the HACD result.\r\n");
+		printf("-mergethreshold <volume> : Threshold below which hulls are merged if they are smaller than the given volume.\r\n");
 		printf("-c <concavity> : Between 0 and 1 are good ranges to try; default is 0.2.  The smaller the number, the more convex hulls are produced.\r\n");
 		printf("\r\n");
 		printf("Example: TestHACD hornbug.obj -m 40 -v 64\r\n");
@@ -80,6 +81,11 @@ void main(int argc,const char ** argv)
 			else if ( strcmp(option,"-merge") == 0 )
 			{
 				desc.mMaxMergeHullCount = getIntArg(scan+1,argc,argv);
+				scan+=2;
+			}
+			else if ( strcmp(option,"-mergethreshold") == 0 )
+			{
+				desc.mSmallClusterThreshold = getFloatArg(scan+1,argc,argv);
 				scan+=2;
 			}
 			else if ( strcmp(option,"-c") == 0 )
@@ -113,6 +119,7 @@ void main(int argc,const char ** argv)
 				printf("Max Hull Vertex Count   : %3d\r\n", desc.mMaxHullVertices );
 				printf("Max Convex Hulls        : %3d\r\n", desc.mMaxHullCount );
 				printf("Max Merged Convex Hulls : %3d\r\n", desc.mMaxMergeHullCount );
+				printf("Merge Threshold         : %0.2f\r\n", desc.mSmallClusterThreshold);
 				printf("\r\n");
 				hacd::HaU32 hullCount = HACD::gHACD->performHACD(desc);
 				if ( hullCount != 0 )
