@@ -196,6 +196,10 @@
 				Name="src"
 				>
 				<File
+					RelativePath="..\HACD\src\AutoGeometry.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\HACD\src\ConvexHull.cpp"
 					>
 				</File>
@@ -255,6 +259,10 @@
 			<Filter
 				Name="include"
 				>
+				<File
+					RelativePath="..\HACD\include\AutoGeometry.h"
+					>
+				</File>
 				<File
 					RelativePath="..\HACD\include\dgArray.h"
 					>
