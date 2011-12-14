@@ -114,6 +114,8 @@ namespace hacd
 
 	};
 
+	typedef void (*CallBackFunction)(const char *, HaF32 progress);
+
 #define HACD_NEW(T) new(#T,__FILE__,__LINE__,sizeof(T)) T
 
 }; // end HACD namespace

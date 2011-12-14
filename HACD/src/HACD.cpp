@@ -45,6 +45,7 @@ class MyHACD_API : public HACD_API, public UANS::UserAllocated
 public:
 	MyHACD_API(void)
 	{
+		
 	}
 	virtual ~MyHACD_API(void)
 	{
@@ -55,6 +56,7 @@ public:
 	{
 		hacd::HaU32 ret = 0;
 		releaseHACD();
+		
 		if ( desc.mVertexCount )
 		{
 			{
@@ -80,7 +82,7 @@ public:
 					uv,sizeof(hacd::HaF32)*2,dummyIndex,
 					uv,sizeof(hacd::HaF32)*2,dummyIndex);
 
-				dgMeshEffect *result = mesh.CreateConvexApproximation(desc.mConcavity,desc.mMaxHullCount);
+				dgMeshEffect *result = mesh.CreateConvexApproximation(desc.mConcavity,desc.mMaxHullCount, desc.mCallback);
 
 				if ( result )
 				{
@@ -147,6 +149,9 @@ public:
 				ret= (HaU32)mHulls.size();
 			}
 		}
+
+		if (desc.mCallback)
+			(desc.mCallback)("+ Merging Hulls\n", 0.0);
 
 		if ( ret && ((ret > desc.mMaxMergeHullCount) || 
 			(desc.mSmallClusterThreshold != 0.0f)) )

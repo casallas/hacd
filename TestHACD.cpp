@@ -3,7 +3,7 @@
 #include <string.h>
 #include <assert.h>
 #include <math.h>
-
+#include <iostream>
 /*!
 **
 ** Copyright (c) 20011 by John W. Ratcliff mailto:jratcliffscarab@gmail.com
@@ -69,6 +69,12 @@ int getIntArg(int arg,int argc,const char **argv)
 	}
 	return ret;
 }
+
+extern "C" void hacdCallback(const char *message, hacd::HaF32 progress)
+{
+	std::cout << message;
+}
+
 void main(int argc,const char ** argv)
 {
 	if ( argc == 1 )
@@ -136,6 +142,7 @@ void main(int argc,const char ** argv)
 				desc.mIndices = (hacd::HaU32 *)obj.mIndices;
 				desc.mVertices = obj.mVertices;
 			}
+			desc.mCallback = static_cast<hacd::CallBackFunction>(&hacdCallback);
 			if ( desc.mTriangleCount )
 			{
 				printf("Performing HACD on %d input triangles.\r\n", desc.mTriangleCount );

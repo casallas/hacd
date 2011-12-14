@@ -2982,7 +2982,7 @@ class dgClusterList: public dgList<dgClusterFace>
 	  hacd::HaF64 m_perimeter;
 };
 
-dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconcavity, hacd::HaI32 maxCount) 
+dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconcavity, hacd::HaI32 maxCount, hacd::CallBackFunction callback) 
 	:dgPolyhedra()
 {
 	Init(true);
@@ -3054,6 +3054,9 @@ dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconca
 	hacd::HaF64 aspectRatioCoeficent = absoluteconcavity / hacd::HaF32(10.0f);
 	meshMask = mesh.IncLRU();
 
+	if (callback)
+		(callback)("+ Calculating initial cost\n", 0.0);
+
 	// calculate all the initial cost of all clusters, which at this time are all a single faces
 	for (hacd::HaI32 faceIndex = 1; faceIndex < faceCount; faceIndex++) {
 		vertexMark++;
@@ -3062,12 +3065,32 @@ dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconca
 		clusterList.CalculateNodeCost(mesh, meshMask, &vertexPool[0], &vertexMarks[0], vertexMark, &clusters[0], diagonalInv, aspectRatioCoeficent, proxyList, heap);
 	}
 	
-	
+	hacd::HaF32 progress, progressOld;
+	progress = progressOld = 0.0f;
+	hacd::HaF32 ptgStep = 1.0f;
+	hacd::HaF32 startConcavity = (hacd::HaF32)heap.Value();
+	hacd::HaF32 targetRange = absoluteconcavity - startConcavity;
+	if (targetRange == 0.0f)
+		targetRange = 1.0f;
+
+	if (callback)
+		(callback)("+ Merging Clusters\n", 0.0);
+
 	// calculate all essential convex clusters by merging the all possible clusters according 
 	// which combined concavity es lower that the max absolute concavity 
 	// select the pair with the smaller concavity and fuse then into a larger cluster
 	hacd::HaI32 essencialClustersCount = faceCount - 1;
-	while (heap.GetCount() && ((heap.Value() < absoluteconcavity) || (essencialClustersCount > maxCount))) {
+	char msg[1024];
+	while (heap.GetCount() && ((heap.Value() < absoluteconcavity) || (essencialClustersCount > maxCount))) 
+	{
+		progress = (((hacd::HaF32)heap.Value() - startConcavity) / targetRange) * 100.0f;
+		if ((progress-progressOld) > ptgStep && callback)
+		{
+			sprintf_s(msg, "%3.2f %% \t \t \r", progress);
+			(*callback)(msg, progress);
+			progressOld = progress;
+		}
+
 		dgList<dgPairProxi>::dgListNode* const pairNode = heap[0];
 		heap.Pop();
 		dgPairProxi& pair = pairNode->GetInfo();
@@ -3153,6 +3176,12 @@ dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconca
 		proxyList.Remove(pairNode);
 	}
 
+	/*
+	if (callback)
+	{
+		sprintf_s(msg, "# clusters =  %lu \t C = %f\n", static_cast<unsigned long>(essencialClustersCount), heap.Value());
+		(*callback)(msg, 0.0f);
+	}*/
 
 	// if the essential convex cluster count is larger than the the maximum specified by the user 
 	// then resuming the cluster again to the heap and start merging then by the the worse merging criteria
@@ -3199,6 +3228,8 @@ maxCount = 1;
 	}
 */
 
+	if (callback)
+		(callback)("+ Generating Hulls\n", 0.0);
 
 	BeginPolygon();
 	hacd::HaF32 layer = hacd::HaF32(0.0f);
@@ -3262,7 +3293,7 @@ maxCount = 1;
 }
 
 
-dgMeshEffect* dgMeshEffect::CreateConvexApproximation(hacd::HaF32 maxConcavity, hacd::HaI32 maxCount) const
+dgMeshEffect* dgMeshEffect::CreateConvexApproximation(hacd::HaF32 maxConcavity, hacd::HaI32 maxCount, hacd::CallBackFunction callback) const
 {
 	dgMeshEffect triangleMesh(*this);
 	if (maxCount <= 1) {
@@ -3271,6 +3302,6 @@ dgMeshEffect* dgMeshEffect::CreateConvexApproximation(hacd::HaF32 maxConcavity, 
 	if (maxConcavity <= hacd::HaF32 (1.0e-5f)) {
 		maxConcavity = hacd::HaF32 (1.0e-5f);
 	}
-	dgMeshEffect* const convexPartion = HACD_NEW(dgMeshEffect)(triangleMesh, maxConcavity, maxCount );
+	dgMeshEffect* const convexPartion = HACD_NEW(dgMeshEffect)(triangleMesh, maxConcavity, maxCount, callback);
 	return convexPartion;
 }

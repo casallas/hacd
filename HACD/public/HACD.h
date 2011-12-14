@@ -38,6 +38,7 @@ namespace HACD
 class HACD_API
 {
 public:
+	
 	class Desc
 	{
 	public:
@@ -55,6 +56,7 @@ public:
 		hacd::HaU32			mMaxHullVertices;
 		hacd::HaF32			mConcavity;
 		hacd::HaF32			mSmallClusterThreshold;
+		hacd::CallBackFunction	mCallback;
 		void init(void)
 		{
 			mTriangleCount = 0;
@@ -66,6 +68,7 @@ public:
 			mMaxHullVertices = 64;
 			mConcavity = 0.2f;
 			mSmallClusterThreshold = 0.0f;
+			mCallback = NULL;
 		}
 	};
 
