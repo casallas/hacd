@@ -45,7 +45,7 @@ dgGoogol::dgGoogol(hacd::HaF64 value)
 	m_mantissa[0] = (hacd::HaI64 (hacd::HaF64 (hacd::HaU64(1)<<62) * mantissa));
 
 	// it looks like GCC have problems with this
-	HACD_ASSERT (m_mantissa[0] >= 0);
+//	HACD_ASSERT (m_mantissa[0] >= 0);
 }
 
 

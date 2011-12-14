@@ -179,7 +179,7 @@ class CHull : public UANS::UserAllocated
 
 typedef hacd::vector< CHull * > CHullVector;
 
-class MyMergeHullsInterface : public MergeHullsInterface, public hacd::UserAllocated
+class MyMergeHullsInterface : public MergeHullsInterface, public UANS::UserAllocated
 {
 public:
 	MyMergeHullsInterface(void)
