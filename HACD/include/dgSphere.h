@@ -22,23 +22,18 @@
 #ifndef __dgSphere__
 #define __dgSphere__
 
-//#include "dgStdafx.h"
 #include "dgTypes.h"
 #include "dgVector.h"
 #include "dgMatrix.h"
 #include "dgQuaternion.h"
 
 
-//class dgFace; 
 class dgPlane;
-//class dgCamera;
 
 class dgSphere: public dgMatrix
 {
 	public:
 	dgSphere ();
-//	dgSphere (const dgQuaternion &quat, const dgVector &position, const dgVector dim = dgVector(0, 0, 0, 0));
-//	dgSphere (const dgMatrix &matrix, const dgVector dim = dgVector(0, 0, 0, 0));
 
 	dgSphere (const dgQuaternion &quat, const dgVector &position, const dgVector& dim = dgVector(0, 0, 0, 0));
 	dgSphere (const dgMatrix &matrix, const dgVector& dim = dgVector(0, 0, 0, 0));
@@ -47,32 +42,9 @@ class dgSphere: public dgMatrix
 	void Scale (hacd::HaF32 Ws, hacd::HaF32 Hs, hacd::HaF32 Bs) ;
 	void SetDimensions (hacd::HaF32 W, hacd::HaF32 H, hacd::HaF32 B);
 	void SetDimensions (const hacd::HaF32 vertex[], hacd::HaI32 strideInBytes, hacd::HaI32 vertexCount, const dgMatrix *basis = NULL);
-	void SetDimensions (const hacd::HaF32 vertex[], hacd::HaI32 strideInBytes, const hacd::HaI32 trangles[], hacd::HaI32 indexCount, const dgMatrix *basis);
-//	void SetDimensions (const hacd::HaF32 vertex[], hacd::HaI32 strideInBytes, const hacd::HaI32 index[], hacd::HaI32 indexCount, const dgMatrix *basis = NULL);
-
-	// return:  0 if the sphere is wholly inside the viewport
-	//          1 if the sphere is partially inside the viewport
-	//         -1 if the sphere is wholly outside the viewport
-//	hacd::HaI32 VisibilityTest (const dgCamera* camera) const;
-//	hacd::HaI32 VisibilityTest (const dgCamera* camera, const dgMatrix &worldMatrix) const; 
-//	void Render (const dgCamera* camera, const dgMatrix &transform, unsigned rgb) const;
+	void SetDimensions (const hacd::HaF32 vertex[], hacd::HaI32 strideInBytes, const hacd::HaI32 triangles[], hacd::HaI32 indexCount, const dgMatrix *basis);
 
 	private:
-/*
- 	typedef hacd::HaI32 (dgSphere::*CachedVisibilityTest) (const dgMatrix &point, const dgPlane* plane) const;
-
-	mutable CachedVisibilityTest planeTest;
-	static CachedVisibilityTest planeTestArray[6];
-
-	void ChangeCachedVisibilityTest (CachedVisibilityTest	fnt);
-	hacd::HaI32 FrontTest  (const dgMatrix &point, const dgPlane* plane) const;
-	hacd::HaI32 RearTest   (const dgMatrix &point, const dgPlane* plane) const;
-	hacd::HaI32 LeftTest   (const dgMatrix &point, const dgPlane* plane) const;
-	hacd::HaI32 RightTest  (const dgMatrix &point, const dgPlane* plane) const;
-	hacd::HaI32 TopTest    (const dgMatrix &point, const dgPlane* plane) const;
-	hacd::HaI32 BottomTest (const dgMatrix &point, const dgPlane* plane) const;
-	hacd::HaI32 VisibilityTestLow (const dgCamera* camera, const dgMatrix& viewMNatrix) const;
-*/
 
 	public:
 	dgVector m_size;

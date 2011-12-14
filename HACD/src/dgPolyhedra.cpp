@@ -19,17 +19,17 @@
 * 3. This notice may not be removed or altered from any source distribution.
 */
 
-//#include "dgStdafx.h"
+#include "dgTypes.h"
 #include "dgHeap.h"
 #include "dgStack.h"
 #include "dgSphere.h"
 #include "dgPolyhedra.h"
+#include "dgConvexHull3d.h"
 #include "dgSmallDeterminant.h"
 #include <string.h>
 
+
 #pragma warning(disable:4100)
-
-
 //#define DG_MIN_EDGE_ASPECT_RATIO  hacd::HaF64 (0.02f)
 
 class dgDiagonalEdge
@@ -155,8 +155,8 @@ namespace InternalPolyhedra
 	{
 		hacd::HaI32 size;
 
-		VertexCache (hacd::HaI32 t)
-			:dgList<dgEdge*>()
+		VertexCache (hacd::HaI32 t, dgMemoryAllocator* const allocator)
+			:dgList<dgEdge*>(allocator)
 		{
 			size   = t;
 		} 
@@ -1750,7 +1750,7 @@ bool dgPolyhedra::TriangulateFace (dgEdge* face, const hacd::HaF32* const vertex
 
 
 
-dgPolyhedra::dgPolyhedra ()
+dgPolyhedra::dgPolyhedra (void)
 	:dgTree <dgEdge, hacd::HaI64>()
 	,m_baseMark(0)
 	,m_edgeMark(0)
@@ -3491,13 +3491,15 @@ void dgPolyhedra::Triangulate (const hacd::HaF64* const vertex, hacd::HaI32 stri
 					} while (ptr != edge);
 					leftOver->AddFace(i, index, data);
 
-				} else {
-					//dgTrace (("Deleting face:"));					
-					ptr = edge;
-					do {
-						//dgTrace (("%d ", ptr->m_incidentVertex));
-					} while (ptr != edge);
-					//dgTrace (("\n"));					
+				} 
+				else 
+				{
+//					dgTrace (("Deleting face:"));					
+//					ptr = edge;
+//					do {
+//						dgTrace (("%d ", ptr->m_incidentVertex));
+//					} while (ptr != edge);
+////					dgTrace (("\n"));					
 				}
 
 				DeleteFace (edge);
@@ -3839,99 +3841,194 @@ void dgPolyhedra::ConvexPartition (const hacd::HaF64* const vertex, hacd::HaI32 
 
 dgSphere dgPolyhedra::CalculateSphere (const hacd::HaF64* const vertex, hacd::HaI32 strideInBytes, const dgMatrix* const basis) const
 {
-	dgStack<hacd::HaI32> pool (GetCount() * 3 + 6); 
-	hacd::HaI32* const indexList = &pool[0]; 
+/*
+		// this si a degenerate mesh of a flat plane calculate OOBB by discrete rotations
+		dgStack<hacd::HaI32> pool (GetCount() * 3 + 6); 
+		hacd::HaI32* const indexList = &pool[0]; 
 
-	dgMatrix axis (dgGetIdentityMatrix());
-	dgBigVector p0 (hacd::HaF32 ( 1.0e10f), hacd::HaF32 ( 1.0e10f), hacd::HaF32 ( 1.0e10f), hacd::HaF32 (0.0f));
-	dgBigVector p1 (hacd::HaF32 (-1.0e10f), hacd::HaF32 (-1.0e10f), hacd::HaF32 (-1.0e10f), hacd::HaF32 (0.0f));
+		dgMatrix axis (dgGetIdentityMatrix());
+		dgBigVector p0 (hacd::HaF32 ( 1.0e10f), hacd::HaF32 ( 1.0e10f), hacd::HaF32 ( 1.0e10f), hacd::HaF32 (0.0f));
+		dgBigVector p1 (hacd::HaF32 (-1.0e10f), hacd::HaF32 (-1.0e10f), hacd::HaF32 (-1.0e10f), hacd::HaF32 (0.0f));
 
-	hacd::HaI32 stride = hacd::HaI32 (strideInBytes / sizeof (hacd::HaF64));
-	hacd::HaI32 indexCount = 0;
+		hacd::HaI32 stride = hacd::HaI32 (strideInBytes / sizeof (hacd::HaF64));
+		hacd::HaI32 indexCount = 0;
+		hacd::HaI32 mark = IncLRU();
+		dgPolyhedra::Iterator iter(*this);
+		for (iter.Begin(); iter; iter ++) {
+			dgEdge* const edge = &(*iter);
+			if (edge->m_mark != mark) {
+				dgEdge *ptr = edge;
+				do {
+					ptr->m_mark = mark;
+					ptr = ptr->m_twin->m_next;
+				} while (ptr != edge);
+				hacd::HaI32 index = edge->m_incidentVertex;
+				indexList[indexCount + 6] = edge->m_incidentVertex;
+				dgBigVector point (vertex[index * stride + 0], vertex[index * stride + 1], vertex[index * stride + 2], hacd::HaF32 (0.0f));
+				for (hacd::HaI32 i = 0; i < 3; i ++) {
+					if (point[i] < p0[i]) {
+						p0[i] = point[i];
+						indexList[i * 2 + 0] = index;
+					}
+					if (point[i] > p1[i]) {
+						p1[i] = point[i];
+						indexList[i * 2 + 1] = index;
+					}
+				}
+				indexCount ++;
+			}
+		}
+		indexCount += 6;
+
+
+		dgBigVector size (p1 - p0);
+		hacd::HaF64 volume = size.m_x * size.m_y * size.m_z;
+
+
+		for (hacd::HaF32 pitch = hacd::HaF32 (0.0f); pitch < hacd::HaF32 (90.0f); pitch += hacd::HaF32 (10.0f)) {
+			dgMatrix pitchMatrix (dgPitchMatrix(pitch * hacd::HaF32 (3.1416f) / hacd::HaF32 (180.0f)));
+			for (hacd::HaF32 yaw = hacd::HaF32 (0.0f); yaw  < hacd::HaF32 (90.0f); yaw  += hacd::HaF32 (10.0f)) {
+				dgMatrix yawMatrix (dgYawMatrix(yaw * hacd::HaF32 (3.1416f) / hacd::HaF32 (180.0f)));
+				for (hacd::HaF32 roll = hacd::HaF32 (0.0f); roll < hacd::HaF32 (90.0f); roll += hacd::HaF32 (10.0f)) {
+					hacd::HaI32 tmpIndex[6];
+					dgMatrix rollMatrix (dgRollMatrix(roll * hacd::HaF32 (3.1416f) / hacd::HaF32 (180.0f)));
+					dgMatrix tmp (pitchMatrix * yawMatrix * rollMatrix);
+					dgBigVector q0 (hacd::HaF32 ( 1.0e10f), hacd::HaF32 ( 1.0e10f), hacd::HaF32 ( 1.0e10f), hacd::HaF32 (0.0f));
+					dgBigVector q1 (hacd::HaF32 (-1.0e10f), hacd::HaF32 (-1.0e10f), hacd::HaF32 (-1.0e10f), hacd::HaF32 (0.0f));
+
+					hacd::HaF32 volume1 = hacd::HaF32 (1.0e10f);
+					for (hacd::HaI32 i = 0; i < indexCount; i ++) {
+						hacd::HaI32 index = indexList[i];
+						dgBigVector point (vertex[index * stride + 0], vertex[index * stride + 1], vertex[index * stride + 2], hacd::HaF32 (0.0f));
+						point = tmp.UnrotateVector(point);
+
+						for (hacd::HaI32 j = 0; j < 3; j ++) {
+							if (point[j] < q0[j]) {
+								q0[j] = point[j];
+								tmpIndex[j * 2 + 0] = index;
+							}
+							if (point[j] > q1[j]) {
+								q1[j] = point[j];
+								tmpIndex[j * 2 + 1] = index;
+							}
+						}
+
+
+						dgVector size1 (q1 - q0);
+						volume1 = size1.m_x * size1.m_y * size1.m_z;
+						if (volume1 >= volume) {
+							break;
+						}
+					}
+
+					if (volume1 < volume) {
+						p0 = q0;
+						p1 = q1;
+						axis = tmp;
+						volume = volume1;
+						memcpy (indexList, tmpIndex, sizeof (tmpIndex));
+					}
+				}
+			}
+		}
+
+		HACD_ASSERT (0);
+		dgSphere sphere (axis);
+		dgVector q0 (p0);
+		dgVector q1 (p1);
+		sphere.m_posit = axis.RotateVector((q1 + q0).Scale (hacd::HaF32 (0.5f)));
+		sphere.m_size = (q1 - q0).Scale (hacd::HaF32 (0.5f));
+		return sphere;
+*/
+
+	hacd::HaI32 stride = hacd::HaI32 (strideInBytes / sizeof (hacd::HaF64));	
+
+	hacd::HaI32 vertexCount = 0;
 	hacd::HaI32 mark = IncLRU();
 	dgPolyhedra::Iterator iter(*this);
 	for (iter.Begin(); iter; iter ++) {
 		dgEdge* const edge = &(*iter);
 		if (edge->m_mark != mark) {
-			dgEdge *ptr = edge;
+			dgEdge* ptr = edge;
 			do {
 				ptr->m_mark = mark;
 				ptr = ptr->m_twin->m_next;
 			} while (ptr != edge);
-			hacd::HaI32 index = edge->m_incidentVertex;
-			indexList[indexCount + 6] = edge->m_incidentVertex;
-			dgBigVector point (vertex[index * stride + 0], vertex[index * stride + 1], vertex[index * stride + 2], hacd::HaF32 (0.0f));
-			for (hacd::HaI32 i = 0; i < 3; i ++) {
-				if (point[i] < p0[i]) {
-					p0[i] = point[i];
-					indexList[i * 2 + 0] = index;
-				}
-				if (point[i] > p1[i]) {
-					p1[i] = point[i];
-					indexList[i * 2 + 1] = index;
-				}
-			}
-			indexCount ++;
+			vertexCount ++;
 		}
 	}
-	indexCount += 6;
+	HACD_ASSERT (vertexCount);
 
-
-	dgBigVector size (p1 - p0);
-	hacd::HaF64 volume = size.m_x * size.m_y * size.m_z;
-
-
-	for (hacd::HaF32 pitch = hacd::HaF32 (0.0f); pitch < hacd::HaF32 (90.0f); pitch += hacd::HaF32 (10.0f)) {
-		dgMatrix pitchMatrix (dgPitchMatrix(pitch * hacd::HaF32 (3.1416f) / hacd::HaF32 (180.0f)));
-		for (hacd::HaF32 yaw = hacd::HaF32 (0.0f); yaw  < hacd::HaF32 (90.0f); yaw  += hacd::HaF32 (10.0f)) {
-			dgMatrix yawMatrix (dgYawMatrix(yaw * hacd::HaF32 (3.1416f) / hacd::HaF32 (180.0f)));
-			for (hacd::HaF32 roll = hacd::HaF32 (0.0f); roll < hacd::HaF32 (90.0f); roll += hacd::HaF32 (10.0f)) {
-				hacd::HaI32 tmpIndex[6];
-				dgMatrix rollMatrix (dgRollMatrix(roll * hacd::HaF32 (3.1416f) / hacd::HaF32 (180.0f)));
-				dgMatrix tmp (pitchMatrix * yawMatrix * rollMatrix);
-				dgBigVector q0 (hacd::HaF32 ( 1.0e10f), hacd::HaF32 ( 1.0e10f), hacd::HaF32 ( 1.0e10f), hacd::HaF32 (0.0f));
-				dgBigVector q1 (hacd::HaF32 (-1.0e10f), hacd::HaF32 (-1.0e10f), hacd::HaF32 (-1.0e10f), hacd::HaF32 (0.0f));
-
-				hacd::HaF32 volume1 = hacd::HaF32 (1.0e10f);
-				for (hacd::HaI32 i = 0; i < indexCount; i ++) {
-					hacd::HaI32 index = indexList[i];
-					dgBigVector point (vertex[index * stride + 0], vertex[index * stride + 1], vertex[index * stride + 2], hacd::HaF32 (0.0f));
-					point = tmp.UnrotateVector(point);
-
-					for (hacd::HaI32 j = 0; j < 3; j ++) {
-						if (point[j] < q0[j]) {
-							q0[j] = point[j];
-							tmpIndex[j * 2 + 0] = index;
-						}
-						if (point[j] > q1[j]) {
-							q1[j] = point[j];
-							tmpIndex[j * 2 + 1] = index;
-						}
-					}
-
-
-					dgVector size1 (q1 - q0);
-					volume1 = size1.m_x * size1.m_y * size1.m_z;
-					if (volume1 >= volume) {
-						break;
-					}
-				}
-
-				if (volume1 < volume) {
-					p0 = q0;
-					p1 = q1;
-					axis = tmp;
-					volume = volume1;
-					memcpy (indexList, tmpIndex, sizeof (tmpIndex));
-				}
-			}
+	mark = IncLRU();
+	hacd::HaI32 vertexCountIndex = 0;
+	dgStack<dgBigVector> pool (vertexCount);
+	for (iter.Begin(); iter; iter ++) {
+		dgEdge* const edge = &(*iter);
+		if (edge->m_mark != mark) {
+			dgEdge* ptr = edge;
+			do {
+				ptr->m_mark = mark;
+				ptr = ptr->m_twin->m_next;
+			} while (ptr != edge);
+			hacd::HaI32 incidentVertex = edge->m_incidentVertex * stride;
+			pool[vertexCountIndex] = dgBigVector (vertex[incidentVertex + 0], vertex[incidentVertex + 1], vertex[incidentVertex + 2], hacd::HaF32 (0.0f));
+			vertexCountIndex ++;
 		}
 	}
+	HACD_ASSERT (vertexCountIndex <= vertexCount);
 
+	dgMatrix axis (dgGetIdentityMatrix());
 	dgSphere sphere (axis);
-	dgVector q0 (p0);
-	dgVector q1 (p1);
-	sphere.m_posit = axis.RotateVector((q1 + q0).Scale (hacd::HaF32 (0.5f)));
-	sphere.m_size = (q1 - q0).Scale (hacd::HaF32 (0.5f));
+	dgConvexHull3d convexHull (&pool[0].m_x, sizeof (dgBigVector), vertexCountIndex, 0.0f);
+	if (convexHull.GetCount()) {
+		dgStack<hacd::HaI32> triangleList (convexHull.GetCount() * 3); 				
+		hacd::HaI32 trianglesCount = 0;
+		for (dgConvexHull3d::dgListNode* node = convexHull.GetFirst(); node; node = node->GetNext()) {
+			dgConvexHull3DFace* const face = &node->GetInfo();
+			triangleList[trianglesCount * 3 + 0] = face->m_index[0];
+			triangleList[trianglesCount * 3 + 1] = face->m_index[1];
+			triangleList[trianglesCount * 3 + 2] = face->m_index[2];
+			trianglesCount ++;
+			HACD_ASSERT ((trianglesCount * 3) <= triangleList.GetElementsCount());
+		}
+
+		dgVector* const dst = (dgVector*) &pool[0].m_x;
+		for (hacd::HaI32 i = 0; i < convexHull.GetVertexCount(); i ++) {
+			dst[i] = convexHull.GetVertex(i);
+		}
+		sphere.SetDimensions (&dst[0].m_x, sizeof (dgVector), &triangleList[0], trianglesCount * 3, NULL);
+
+	} else if (vertexCountIndex >= 3) {
+		dgStack<hacd::HaI32> triangleList (GetCount() * 3 * 2); 
+		hacd::HaI32 mark = IncLRU();
+		hacd::HaI32 trianglesCount = 0;
+		for (iter.Begin(); iter; iter ++) {
+			dgEdge* const edge = &(*iter);
+			if (edge->m_mark != mark) {
+				dgEdge* ptr = edge;
+				do {
+					ptr->m_mark = mark;
+					ptr = ptr->m_twin->m_next;
+				} while (ptr != edge);
+
+				ptr = edge->m_next->m_next;
+				do {
+					triangleList[trianglesCount * 3 + 0] = edge->m_incidentVertex;
+					triangleList[trianglesCount * 3 + 1] = ptr->m_prev->m_incidentVertex;
+					triangleList[trianglesCount * 3 + 2] = ptr->m_incidentVertex;
+					trianglesCount ++;
+					HACD_ASSERT ((trianglesCount * 3) <= triangleList.GetElementsCount());
+					ptr = ptr->m_twin->m_next;
+				} while (ptr != edge);
+
+				dgVector* const dst = (dgVector*) &pool[0].m_x;
+				for (hacd::HaI32 i = 0; i < vertexCountIndex; i ++) {
+					dst[i] = pool[i];
+				}
+				sphere.SetDimensions (&dst[0].m_x, sizeof (dgVector), &triangleList[0], trianglesCount * 3, NULL);
+			}
+		}
+	}
 	return sphere;
+
 }

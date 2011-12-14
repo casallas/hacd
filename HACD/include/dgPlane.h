@@ -22,7 +22,6 @@
 #ifndef __dgPlane__
 #define __dgPlane__
 
-//#include "dgStdafx.h"
 #include "dgVector.h"
 
 class dgPlane: public dgVector

@@ -19,7 +19,7 @@
 * 3. This notice may not be removed or altered from any source distribution.
 */
 
-//#include "dgStdafx.h"
+#include "dgTypes.h"
 #include "dgStack.h"
 #include "dgGoogol.h"
 #include "dgConvexHull3d.h"

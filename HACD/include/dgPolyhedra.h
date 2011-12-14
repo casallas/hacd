@@ -22,10 +22,11 @@
 #ifndef __dgPolyhedra__
 #define __dgPolyhedra__
 
-//#include "dgStdafx.h"
+#include "dgTypes.h"
 #include "dgList.h"
 #include "dgTree.h"
 #include "dgHeap.h"
+
 
 class dgEdge;
 class dgPlane;
@@ -35,23 +36,6 @@ class dgPolyhedra;
 
 
 typedef hacd::HaI64 dgEdgeKey;
-
-/*
-class dgPolyhedraDescriptor
-{
-	public:
-
-	 dgPolyhedraDescriptor (const dgPolyhedra& polyhedra);
-	 ~dgPolyhedraDescriptor ();
-	 void Update (const dgPolyhedra& polyhedra);
-
-	hacd::HaI32 m_faceCount;							 // total face count including openfaces
-	hacd::HaI32 m_edgeCount;							 // total edge count count including openfaces
-	hacd::HaI32 m_vertexCount;						 // total vertex count including openfaces
-	hacd::HaI32 m_maxVertexIndex;
-	dgList<dgEdge*> m_unboundedLoops;
-};
-*/
 
 class dgEdge
 {
@@ -69,7 +53,7 @@ class dgEdge
 };
 
 
-class dgPolyhedra: public dgTree <dgEdge, dgEdgeKey>, public UANS::UserAllocated
+class dgPolyhedra: public dgTree <dgEdge, dgEdgeKey>
 {
 	public:
 
@@ -126,76 +110,6 @@ class dgPolyhedra: public dgTree <dgEdge, dgEdgeKey>, public UANS::UserAllocated
 	void Optimize (const hacd::HaF64* const pool, hacd::HaI32 strideInBytes, hacd::HaF64 tol);
 	void Triangulate (const hacd::HaF64* const vertex, hacd::HaI32 strideInBytes, dgPolyhedra* const leftOversOut);
 	void ConvexPartition (const hacd::HaF64* const vertex, hacd::HaI32 strideInBytes, dgPolyhedra* const leftOversOut);
-
-/*
-	bool SanityCheck() const;
-
-
-	// create an edge and add it to the tree. 
-	// the edge is not linked to the existing edge list
-	
-
-	// create a complete edge and add it to the tree
-	//	the new edge is linked to the existing edge list
-//	dgEdge* AddEdge (hacd::HaI32 v0, hacd::HaI32 v1);
-
-	void DeleteEdge (hacd::HaI32 v0, hacd::HaI32 v1);
-	void DeleteEdge (dgEdge* const edge);
-
-	void DeleteAllFace();
-
-	
-
-  	hacd::HaI32 GetMaxIndex() const;
-  	
-	hacd::HaI32 GetUnboundedFaceCount() const;
-	
-	dgBigVector BigFaceNormal (dgEdge* const face, const hacd::HaF64* const pool, hacd::HaI32 strideInBytes) const;
-
-
-	
-	
-	dgEdge* SpliteEdgeAndTriangulate (hacd::HaI32 newIndex, dgEdge* const edge);
-
-	dgEdge* FindVertexNode (hacd::HaI32 v0) const;
-	
-	hacd::HaI32 PackVertex (hacd::HaF64* const destArray, const hacd::HaF64* const unpackArray, hacd::HaI32 strideInBytes);
-	void DeleteOverlapingFaces (const hacd::HaF64* const pool, hacd::HaI32 strideInBytes, hacd::HaF64 distTol);
-	void InvertWinding ();
-
-	// find edges edge shared by two or more non adjacent faces
-	// this make impossible to triangulate the polyhedra
-	void GetBadEdges (dgList<dgEdge*>& faceList, const hacd::HaF64* const pool, hacd::HaI32 strideInBytes) const; 
-
-	
-	void GetCoplanarFaces (dgList<dgEdge*>& faceList, dgEdge* startFace, const hacd::HaF64* const pool, hacd::HaI32 hisStrideInBytes, hacd::HaF64 normalDeviation) const;
-	void GetOpenFaces (dgList<dgEdge*>& faceList) const;
-	void CollapseDegenerateFaces (dgPolyhedraDescriptor &desc, const hacd::HaF64* const pool, hacd::HaI32 strideInBytes, hacd::HaF64 area);
-	
-
-
-	// this function assume the mesh is a legal mesh;
-	hacd::HaI32 TriangleList (hacd::HaU32 outputBuffer[], hacd::HaI32 maxBufferSize, hacd::HaI32 vertexCacheSize = 12) const;
-	void SwapInfo (dgPolyhedra& source);
-
-
-*/
-
-	// this function ayend to create a better triangulation of a mesh
-	// by first calling the calling quadrangular and then triangulate 
-	// all quad strips.
-	// this function assume the mesh is a legal mesh;
-	// note1: recommend a call to Triangulate or OptimalTriangulation 
-	//			 before using this function
-	// note2: a index set to 0xffffffff indicate a run start
-	// return index count
-	//	hacd::HaI32 TriangleStrips (hacd::HaU32 outputBuffer[], hacd::HaI32 maxBufferSize, hacd::HaI32 vertexCacheSize = 12) const;
-	//	void OptimalTriangulation (const hacd::HaF64* const vertex, hacd::HaI32 strideInBytes);
-	//	void CombineOpenFaces (const hacd::HaF64* const pool, hacd::HaI32 strideInBytes, hacd::HaF64 distTol);
-	//	bool TriangulateFace (dgEdge* const face, const hacd::HaF64* const vertex, hacd::HaI32 strideInBytes, dgBigVector& normalOut);
-	//	void OptimizeTriangulation (const hacd::HaF64* const vertex, hacd::HaI32 strideInBytes);
-	//	void Quadrangulate (const hacd::HaF64* const vertex, hacd::HaI32 strideInBytes);
-	//	dgEdge* GetBadEdge (dgList<dgEdge*>& faceList  const hacd::HaF64* const pool, hacd::HaI32 strideInBytes) const; 
 
 	private:
 	

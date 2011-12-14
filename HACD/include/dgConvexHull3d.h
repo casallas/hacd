@@ -22,7 +22,6 @@
 #ifndef __DG_CONVEXHULL_3D__
 #define __DG_CONVEXHULL_3D__
 
-//#include "dgStdafx.h"
 #include "dgList.h"
 #include "dgArray.h"
 #include "dgPlane.h"

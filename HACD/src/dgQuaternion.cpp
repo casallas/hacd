@@ -19,7 +19,6 @@
 * 3. This notice may not be removed or altered from any source distribution.
 */
 
-//#include "dgStdafx.h"
 #include "dgVector.h"
 #include "dgMatrix.h"
 #include "dgQuaternion.h"

@@ -84,7 +84,7 @@ class dgConvexHull3d;
 
 
 
-class dgMeshEffect: public dgPolyhedra, public dgRefCounter
+class dgMeshEffect: public dgPolyhedra, public dgRefCounter, public UANS::UserAllocated
 {
 	public:
 
