@@ -118,6 +118,8 @@ namespace hacd
 
 #define HACD_NEW(T) new(#T,__FILE__,__LINE__,sizeof(T)) T
 
+#define HACD_SPRINTF_S sprintf_s
+
 }; // end HACD namespace
 
 #define UANS hacd	// the user allocator namespace

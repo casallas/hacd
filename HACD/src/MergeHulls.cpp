@@ -277,6 +277,7 @@ public:
 		desc.mVcount       = combinedVertexCount;
 		desc.mVertices     = combinedVertices;
 		desc.mVertexStride = sizeof(hacd::HaF32)*3;
+		desc.mUseWuQuantizer = true;
 		HullError hret = hl.CreateConvexHull(desc,hresult);
 		HACD_ASSERT( hret == QE_OK );
 		if ( hret == QE_OK )
@@ -305,6 +306,7 @@ public:
 		desc.mVertices     = combinedVertices;
 		desc.mVertexStride = sizeof(hacd::HaF32)*3;
 		desc.mMaxVertices = mMaxHullVertices;
+		desc.mUseWuQuantizer = true;
 		HullError hret = hl.CreateConvexHull(desc,hresult);
 		HACD_ASSERT( hret == QE_OK );
 		if ( hret == QE_OK )

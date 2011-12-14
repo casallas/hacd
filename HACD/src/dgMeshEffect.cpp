@@ -2651,6 +2651,8 @@ dgMeshEffect::dgMeshEffect (const hacd::HaF64* const vertexCloud, hacd::HaI32 co
 	}
 }
 
+//**** Note, from this point out is a copy of 'MeshEffect3.cpp' from the Newton Physics Engine
+
 
 // based of the paper Hierarchical Approximate Convex Decomposition by Khaled Mamou 
 // with his permission to adapt his algorithm so be more efficient.
@@ -2698,7 +2700,7 @@ class dgPairProxi
 class dgClusterList: public dgList<dgClusterFace>
 {
 	public:
-	dgClusterList() 
+	dgClusterList(void) 
 		: dgList<dgClusterFace>()
 		,m_area (hacd::HaF32 (0.0f))
 		,m_perimeter (hacd::HaF32 (0.0f))
@@ -2880,7 +2882,7 @@ class dgClusterList: public dgList<dgClusterFace>
 	  }
 
 	  // calculate the convex hull of a conched group of faces,
-	  // and measure the concavity, according to Khaled convexity criteria, which is basically
+	  // and measure the concavity, according to Khaled Mamou convexity criteria, which is basically
 	  // has two components, 
 	  // the first is ratio  between the the perimeter of the group of faces
 	  // and the second the largest distance from any of the face to the surface of the hull 
@@ -2978,13 +2980,148 @@ class dgClusterList: public dgList<dgClusterFace>
 	  }
 
 
+	  static hacd::HaF64 CollapseClusters (
+		  dgMeshEffect& mesh, 
+		  dgClusterList* const clusters,
+		  dgUpHeap<dgList<dgPairProxi>::dgListNode*, hacd::HaF64>& head, 
+		  hacd::HaF32 normalizedConcavity, 
+		  hacd::HaI32 maxClustersCount, 
+		  hacd::HaI32& essentialClustersCount,
+		  hacd::HaI32& vertexMark,
+		  dgBigVector* const vertexPool,
+		  hacd::HaI32* const vertexMarks,
+		  hacd::HaF64 diagonalInv,
+		  hacd::HaF64 aspectRatioCoeficent,
+		  dgList<dgPairProxi>& proxyList)
+	  {
+		  hacd::HaF64 concavity = hacd::HaF32 (0.0f);
+
+		  while (head.GetCount() && ((head.Value() < normalizedConcavity) || (essentialClustersCount > maxClustersCount))) 
+		  {
+			  dgList<dgPairProxi>::dgListNode* const pairNode = head[0];
+			  head.Pop();
+			  dgPairProxi& pair = pairNode->GetInfo();
+
+			  HACD_ASSERT((pair.m_edgeA && pair.m_edgeA) || (!pair.m_edgeA && !pair.m_edgeA));
+			  if (pair.m_edgeA && pair.m_edgeB) 
+			  {
+				  HACD_ASSERT(pair.m_edgeA->m_incidentFace != pair.m_edgeB->m_incidentFace);
+				  // merge two clusters
+				  hacd::HaI32 faceIndexA = pair.m_edgeA->m_incidentFace;
+				  hacd::HaI32 faceIndexB = pair.m_edgeB->m_incidentFace;
+				  dgClusterList* listA = &clusters[faceIndexA];
+				  dgClusterList* listB = &clusters[faceIndexB];
+				  if (pair.m_edgeA->m_incidentFace > pair.m_edgeB->m_incidentFace) 
+				  {
+					  Swap(faceIndexA, faceIndexB);
+					  Swap(listA, listB);
+				  }
+
+				  while (listB->GetFirst()) 
+				  {
+					  dgClusterList::dgListNode* const nodeB = listB->GetFirst();
+					  listB->Unlink(nodeB);
+					  dgClusterFace& faceB = nodeB->GetInfo();
+
+					  dgEdge* ptr = faceB.m_edge;
+					  do 
+					  {
+						  ptr->m_incidentFace = faceIndexA;
+						  ptr = ptr->m_next;
+					  } while (ptr != faceB.m_edge);
+					  listA->Append(nodeB);
+				  }
+
+				  essentialClustersCount --;
+
+				  listB->m_area = hacd::HaF32 (0.0f);
+				  listB->m_perimeter = hacd::HaF32 (0.0f);
+				  listA->m_area = pair.m_area;
+				  listA->m_perimeter = pair.m_perimeter;
+
+				  // recalculated the new metric for the new cluster, and tag the used cluster as invalid, so that 
+				  // other potential selection do not try merge with this this one, producing convex that re use a face more than once  
+				  hacd::HaI32 mark = mesh.IncLRU();
+				  for (dgClusterList::dgListNode* node = listA->GetFirst(); node; node = node->GetNext()) 
+				  {
+					  dgClusterFace& face = node->GetInfo();
+					  dgEdge* ptr = face.m_edge;
+					  do 
+					  {
+						  if (ptr->m_userData != hacd::HaU64 (-1)) 
+						  {
+							  dgList<dgPairProxi>::dgListNode* const pairNode = (dgList<dgPairProxi>::dgListNode*) ptr->m_userData;
+							  dgPairProxi& pairProxy = pairNode->GetInfo();
+							  pairProxy.m_edgeA = NULL;
+							  pairProxy.m_edgeB = NULL;
+						  }
+						  ptr->m_userData = hacd::HaU64 (-1);
+						  ptr->m_twin->m_userData = hacd::HaU64 (-1);
+
+						  if ((ptr->m_twin->m_incidentFace == faceIndexA) || (ptr->m_twin->m_incidentFace < 0)) 
+						  {
+							  ptr->m_mark = mark;
+							  ptr->m_twin->m_mark = mark;
+						  }
+
+						  if (ptr->m_mark != mark) 
+						  {
+							  dgClusterList& adjacentList = clusters[ptr->m_twin->m_incidentFace];
+							  for (dgClusterList::dgListNode* adjacentNode = adjacentList.GetFirst(); adjacentNode; adjacentNode = adjacentNode->GetNext()) 
+							  {
+								  dgClusterFace& adjacentFace = adjacentNode->GetInfo();
+								  dgEdge* adjacentEdge = adjacentFace.m_edge;
+								  do 
+								  {
+									  if (adjacentEdge->m_twin->m_incidentFace == faceIndexA)	
+									  {
+										  adjacentEdge->m_twin->m_mark = mark;
+									  }
+									  adjacentEdge = adjacentEdge->m_next;
+								  } while (adjacentEdge != adjacentFace.m_edge);
+							  }
+							  ptr->m_mark = mark - 1;
+						  }
+						  ptr = ptr->m_next;
+					  } while (ptr != face.m_edge);
+				  }
+
+				  // re generated the cost of merging this new all its adjacent clusters, that are still alive. 
+				  vertexMark++;
+				  listA->CalculateNodeCost(mesh, mark, &vertexPool[0], &vertexMarks[0], vertexMark, &clusters[0], diagonalInv, aspectRatioCoeficent, proxyList, head);
+			  }
+
+			  proxyList.Remove(pairNode);
+		  }
+
+		  while (head.GetCount()) 
+		  {
+			  concavity = head.Value();
+			  dgList<dgPairProxi>::dgListNode* const pairNode = head[0];
+			  dgPairProxi& pair = pairNode->GetInfo();
+			  HACD_ASSERT((pair.m_edgeA && pair.m_edgeA) || (!pair.m_edgeA && !pair.m_edgeA));
+			  if (pair.m_edgeA && pair.m_edgeB) 
+			  {
+				  break;
+			  }
+			  head.Pop();
+		  }
+		  return concavity;
+	  }
+
 	  hacd::HaF64 m_area;
 	  hacd::HaF64 m_perimeter;
 };
 
-dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconcavity, hacd::HaI32 maxCount, hacd::CallBackFunction callback) 
+dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 normalizedConcavity, hacd::HaI32 maxCount, hacd::CallBackFunction callback) 
 	:dgPolyhedra()
 {
+
+	if (callback)
+	{
+		(callback)("+ Calculating initial cost\n", 0.0);
+	}
+
 	Init(true);
 
 	dgMeshEffect mesh(source);
@@ -2992,9 +3129,11 @@ dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconca
 	dgStack<dgClusterList> clusterPool(faceCount);
 	dgClusterList* const clusters = &clusterPool[0];
 
-	for (hacd::HaI32 i = 0; i < faceCount; i++) {
+	for (hacd::HaI32 i = 0; i < faceCount; i++) 
+	{
 		clusters[i] = dgClusterList();
 	}
+
 
 	hacd::HaI32 meshMask = mesh.IncLRU();
 	const dgBigVector* const points = mesh.m_points;
@@ -3003,17 +3142,19 @@ dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconca
 	dgMeshEffect::Iterator iter(mesh);
 
 	hacd::HaI32 clusterIndex = 1;
-	for (iter.Begin(); iter; iter++) {
+	for (iter.Begin(); iter; iter++) 
+	{
 		dgEdge* const edge = &(*iter);
 		edge->m_userData = hacd::HaU64 (-1);
-		if ((edge->m_mark != meshMask) && (edge->m_incidentFace > 0)) {
+		if ((edge->m_mark != meshMask) && (edge->m_incidentFace > 0)) 
+		{
 			hacd::HaF64 perimeter = hacd::HaF64(0.0f);
 			dgEdge* ptr = edge;
-			do {
+			do 
+			{
 				dgBigVector p1p0(points[ptr->m_incidentVertex] - points[ptr->m_prev->m_incidentVertex]);
 				perimeter += sqrt(p1p0 % p1p0);
 				ptr->m_incidentFace = clusterIndex;
-
 				ptr->m_mark = meshMask;
 				ptr = ptr->m_next;
 			} while (ptr != edge);
@@ -3050,186 +3191,82 @@ dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconca
 
 	hacd::HaI32 vertexMark = 0;
 
-	hacd::HaF64 diagonalInv = hacd::HaF32(1.0f);
-	hacd::HaF64 aspectRatioCoeficent = absoluteconcavity / hacd::HaF32(10.0f);
+	dgBigVector size;
+	dgMatrix matrix (mesh.CalculateOOBB (size));
+	hacd::HaF64 diagonalLength =  hacd::HaF64 (2.0f) * dgSqrt (size % size);
+	hacd::HaF64 diagonalInv = hacd::HaF64 (1.0f) / diagonalLength;
+	
+	// use same weight coefficient used bu Khaled Mamou  
+	hacd::HaF64 aspectRatioCoeficent = normalizedConcavity * diagonalLength / hacd::HaF32(10.0f);
 	meshMask = mesh.IncLRU();
 
-	if (callback)
-		(callback)("+ Calculating initial cost\n", 0.0);
-
 	// calculate all the initial cost of all clusters, which at this time are all a single faces
-	for (hacd::HaI32 faceIndex = 1; faceIndex < faceCount; faceIndex++) {
+	for (hacd::HaI32 faceIndex = 1; faceIndex < faceCount; faceIndex++) 
+	{
 		vertexMark++;
 		dgClusterList& clusterList = clusters[faceIndex];
 		HACD_ASSERT(clusterList.GetFirst()->GetInfo().m_edge->m_incidentFace == faceIndex);
 		clusterList.CalculateNodeCost(mesh, meshMask, &vertexPool[0], &vertexMarks[0], vertexMark, &clusters[0], diagonalInv, aspectRatioCoeficent, proxyList, heap);
 	}
+
+	hacd::HaF32 percent = 0;
+
+	if (callback)
+	{
+		(callback)("+ Merging Clusters\n",percent);
+	}
 	
-	hacd::HaF32 progress, progressOld;
-	progress = progressOld = 0.0f;
-	hacd::HaF32 ptgStep = 1.0f;
-	hacd::HaF32 startConcavity = (hacd::HaF32)heap.Value();
-	hacd::HaF32 targetRange = absoluteconcavity - startConcavity;
-	if (targetRange == 0.0f)
-		targetRange = 1.0f;
+	hacd::HaI32 essentialClustersCount = faceCount - 1;
+	hacd::HaI32 oldCount = essentialClustersCount;
+	hacd::HaF64 maxConcavity = dgClusterList::CollapseClusters (mesh, clusters, heap, normalizedConcavity, maxCount, essentialClustersCount,
+															  vertexMark, vertexPool, vertexMarks, diagonalInv, aspectRatioCoeficent, proxyList);
 
-	if (callback)
-		(callback)("+ Merging Clusters\n", 0.0);
 
-	// calculate all essential convex clusters by merging the all possible clusters according 
-	// which combined concavity es lower that the max absolute concavity 
-	// select the pair with the smaller concavity and fuse then into a larger cluster
-	hacd::HaI32 essencialClustersCount = faceCount - 1;
-	char msg[1024];
-	while (heap.GetCount() && ((heap.Value() < absoluteconcavity) || (essencialClustersCount > maxCount))) 
+
+	while ((maxConcavity > normalizedConcavity) && (essentialClustersCount < oldCount)) 
 	{
-		progress = (((hacd::HaF32)heap.Value() - startConcavity) / targetRange) * 100.0f;
-		if ((progress-progressOld) > ptgStep && callback)
+		percent+=5;
+		if ( percent > 90 )
 		{
-			sprintf_s(msg, "%3.2f %% \t \t \r", progress);
-			(*callback)(msg, progress);
-			progressOld = progress;
+			percent = 90;
 		}
-
-		dgList<dgPairProxi>::dgListNode* const pairNode = heap[0];
-		heap.Pop();
-		dgPairProxi& pair = pairNode->GetInfo();
-
-		HACD_ASSERT((pair.m_edgeA && pair.m_edgeA) || (!pair.m_edgeA && !pair.m_edgeA));
-		if (pair.m_edgeA && pair.m_edgeB) {
-
-			HACD_ASSERT(pair.m_edgeA->m_incidentFace != pair.m_edgeB->m_incidentFace);
-
-			// merge two clusters
-			hacd::HaI32 faceIndexA = pair.m_edgeA->m_incidentFace;
-			hacd::HaI32 faceIndexB = pair.m_edgeB->m_incidentFace;
-			dgClusterList* listA = &clusters[faceIndexA];
-			dgClusterList* listB = &clusters[faceIndexB];
-			if (pair.m_edgeA->m_incidentFace > pair.m_edgeB->m_incidentFace) {
-				Swap(faceIndexA, faceIndexB);
-				Swap(listA, listB);
-			}
-			
-			while (listB->GetFirst()) {
-				dgClusterList::dgListNode* const nodeB = listB->GetFirst();
-				listB->Unlink(nodeB);
-				dgClusterFace& faceB = nodeB->GetInfo();
-
-				dgEdge* ptr = faceB.m_edge;
-				do {
-					ptr->m_incidentFace = faceIndexA;
-					ptr = ptr->m_next;
-				} while (ptr != faceB.m_edge);
-				listA->Append(nodeB);
-			}
-			essencialClustersCount --;
-
-			listB->m_area = hacd::HaF32 (0.0f);
-			listB->m_perimeter = hacd::HaF32 (0.0f);
-			listA->m_area = pair.m_area;
-			listA->m_perimeter = pair.m_perimeter;
-
-			// recalculated the new metric for the new cluster, and tag the used cluster as invalid, so that 
-			// other potential selection do not try merge with this this one, producing convex that re use a face more than once  
-			hacd::HaI32 mark = mesh.IncLRU();
-			for (dgClusterList::dgListNode* node = listA->GetFirst(); node; node = node->GetNext()) {
-				dgClusterFace& face = node->GetInfo();
-				dgEdge* ptr = face.m_edge;
-				do {
-					if (ptr->m_userData != hacd::HaU64 (-1)) {
-						dgList<dgPairProxi>::dgListNode* const pairNode = (dgList<dgPairProxi>::dgListNode*) ptr->m_userData;
-						dgPairProxi& pairProxy = pairNode->GetInfo();
-						pairProxy.m_edgeA = NULL;
-						pairProxy.m_edgeB = NULL;
-					}
-					ptr->m_userData = hacd::HaU64 (-1);
-					ptr->m_twin->m_userData = hacd::HaU64 (-1);
-
-					if ((ptr->m_twin->m_incidentFace == faceIndexA) || (ptr->m_twin->m_incidentFace < 0)) {
-						ptr->m_mark = mark;
-						ptr->m_twin->m_mark = mark;
-					}
-
-					if (ptr->m_mark != mark) {
-						dgClusterList& adjacentList = clusters[ptr->m_twin->m_incidentFace];
-						for (dgClusterList::dgListNode* adjacentNode = adjacentList.GetFirst(); adjacentNode; adjacentNode = adjacentNode->GetNext()) {
-							dgClusterFace& adjacentFace = adjacentNode->GetInfo();
-							dgEdge* adjacentEdge = adjacentFace.m_edge;
-							do {
-								if (adjacentEdge->m_twin->m_incidentFace == faceIndexA)	{
-									adjacentEdge->m_twin->m_mark = mark;
-								}
-								adjacentEdge = adjacentEdge->m_next;
-							} while (adjacentEdge != adjacentFace.m_edge);
-						}
-						ptr->m_mark = mark - 1;
-					}
-					ptr = ptr->m_next;
-				} while (ptr != face.m_edge);
-			}
-
-			// re generated the cost of merging this new all its adjacent clusters, that are still alive. 
-			vertexMark++;
-			listA->CalculateNodeCost(mesh, mark, &vertexPool[0], &vertexMarks[0], vertexMark, &clusters[0], diagonalInv, aspectRatioCoeficent, proxyList, heap);
+		if ( callback )
+		{
+			char msg[512];
+			HACD_SPRINTF_S(msg,512, "%3.2f %% \t \t \r", percent);
+			(*callback)(msg, percent);
 		}
+		// this means that Khaled Mamou flat (perimeter^ / area) is not really a gradient function
+		// which mean the each time two collapse were fused the need on  the they combined concavity could increase 
+		// the concavity of the mesh and render, what this means is that some of the clusters still active can actually have lower 
+		// lower concavity than what eh combine distance concavity + perimeter/area indicate.
+		// this is similar to a hill climbing algorithm or steepest descend function that has small local minimal.
+		// the algorithm can terminate on a local minimal.
+		// the solution to this si to use an annealing that  increased the temperature 
+		// of one of the parameter as each time the function fail. I am no going to use any complex annealing function 
+		// I will use the spirit of annealing, basically I will double the perimeter/area part of the concavity 
+		//and try again, an continue doing as long as at least one pair of cluster is collapsed in the next pass.
 
-		proxyList.Remove(pairNode);
+		essentialClustersCount = 0;
+		for (hacd::HaI32 faceIndex = 1; faceIndex < faceCount; faceIndex++) 
+		{
+			dgClusterList& clusterList = clusters[faceIndex];
+			if (clusterList.GetCount())	
+			{
+				essentialClustersCount ++;
+			}
+		}
+		normalizedConcavity *= hacd::HaF64 (1.1f);
+		//normalizedConcavity *= hacd::HaF64(2.0f);
+		oldCount = essentialClustersCount;
+		maxConcavity = dgClusterList::CollapseClusters (mesh, clusters, heap, normalizedConcavity, maxCount, essentialClustersCount,
+														vertexMark, vertexPool, vertexMarks, diagonalInv, aspectRatioCoeficent, proxyList);
 	}
 
-	/*
 	if (callback)
 	{
-		sprintf_s(msg, "# clusters =  %lu \t C = %f\n", static_cast<unsigned long>(essencialClustersCount), heap.Value());
-		(*callback)(msg, 0.0f);
-	}*/
-
-	// if the essential convex cluster count is larger than the the maximum specified by the user 
-	// then resuming the cluster again to the heap and start merging then by the the worse merging criteria
-	// also at this time add the distance heuristic to combine disjoint cluster as well.
-	// this is where I disagree with Khaled Mamore, he uses a brute force approach by adding extra points.
-	// I do this to the first partition and then connect disjoint face only on the perimeter
-/*
-maxCount = 1;
-	while (essencialClustersCount > maxCount) {
-
-		heap.Flush();
-		meshMask = mesh.IncLRU();
-
-		// color code each face on each cluster with it cluster index
-		for (hacd::HaI32 faceIndex = 0; faceIndex < faceCount; faceIndex++) {
-			dgClusterList& clusterList = clusters[faceIndex];
-			if (clusterList.GetCount()) {
-				for (dgClusterList::dgListNode* node = clusterList.GetFirst(); node; node = node->GetNext()) {
-					dgClusterFace& face = node->GetInfo();
-					dgEdge* ptr = face.m_edge;
-					do {
-						ptr->m_incidentFace = faceIndex;
-						ptr = ptr->m_next;
-					} while (ptr != face.m_edge);
-				}
-			}
-		}
-			
-		for (hacd::HaI32 faceIndex = 0; faceIndex < faceCount; faceIndex++) {
-			dgClusterList& clusterList = clusters[faceIndex];
-
-			// note: add the disjoint cluster criteria here, but for now just ignore
-
-			// calculate the cost again
-			if (clusterList.GetCount()) {
-
-				// note: something is wrong with my color coding that is not marking the perimeter corrently	
-
-				vertexMark++;
-				clusterList.CalculateNodeCost(mesh, meshMask, &vertexPool[0], &vertexMarks[0], vertexMark, &clusters[0], diagonalInv, aspectRatioCoeficent, proxyList, heap);	
-			}
-			
-		}
+		(callback)("+ Producing output convex hulls\n", 0.0);
 	}
-*/
-
-	if (callback)
-		(callback)("+ Generating Hulls\n", 0.0);
 
 	BeginPolygon();
 	hacd::HaF32 layer = hacd::HaF32(0.0f);
@@ -3237,17 +3274,21 @@ maxCount = 1;
 	dgVertexAtribute polygon[256];
 	memset(polygon, 0, sizeof(polygon));
 	dgArray<dgBigVector> convexVertexBuffer(1024);
-	for (hacd::HaI32 i = 0; i < faceCount; i++) {
+	for (hacd::HaI32 i = 0; i < faceCount; i++) 
+	{
 		dgClusterList& clusterList = clusters[i];
 
-		if (clusterList.GetCount())	{
+		if (clusterList.GetCount())	
+		{
 			hacd::HaI32 count = 0;
-			for (dgClusterList::dgListNode* node = clusterList.GetFirst(); node; node = node->GetNext()) {
+			for (dgClusterList::dgListNode* node = clusterList.GetFirst(); node; node = node->GetNext()) 
+			{
 				dgClusterFace& face = node->GetInfo();
 				dgEdge* edge = face.m_edge;
 
 				dgEdge* sourceEdge = source.FindEdge(edge->m_incidentVertex, edge->m_twin->m_incidentVertex);
-				do {
+				do 
+				{
 					hacd::HaI32 index = edge->m_incidentVertex;
 					convexVertexBuffer[count] = points[index];
 
@@ -3259,35 +3300,31 @@ maxCount = 1;
 
 			dgConvexHull3d convexHull(&convexVertexBuffer[0].m_x, sizeof(dgBigVector), count, 0.0);
 
-			if (convexHull.GetCount()) {
+			if (convexHull.GetCount()) 
+			{
 				const dgBigVector* const vertex = convexHull.GetVertexPool();
-				for (dgConvexHull3d::dgListNode* node = convexHull.GetFirst(); node; node = node->GetNext()) {
+				for (dgConvexHull3d::dgListNode* node = convexHull.GetFirst(); node; node = node->GetNext()) 
+				{
 					const dgConvexHull3DFace* const face = &node->GetInfo();
-
 					hacd::HaI32 i0 = face->m_index[0];
 					hacd::HaI32 i1 = face->m_index[1];
 					hacd::HaI32 i2 = face->m_index[2];
-
 					polygon[0].m_vertex = vertex[i0];
 					polygon[0].m_vertex.m_w = layer;
-
 					polygon[1].m_vertex = vertex[i1];
 					polygon[1].m_vertex.m_w = layer;
-
 					polygon[2].m_vertex = vertex[i2];
 					polygon[2].m_vertex.m_w = layer;
-
 					AddPolygon(3, &polygon[0].m_vertex.m_x, sizeof(dgVertexAtribute), 0);
 				}
-
 				layer += hacd::HaF32(1.0f);
-				//break;
 			}
 		}
 	}
 	EndPolygon(1.0e-5f);
 
-	for (hacd::HaI32 i = 0; i < faceCount; i++) {
+	for (hacd::HaI32 i = 0; i < faceCount; i++) 
+	{
 		clusters[i].RemoveAll();
 	}
 }
@@ -3295,13 +3332,14 @@ maxCount = 1;
 
 dgMeshEffect* dgMeshEffect::CreateConvexApproximation(hacd::HaF32 maxConcavity, hacd::HaI32 maxCount, hacd::CallBackFunction callback) const
 {
-	dgMeshEffect triangleMesh(*this);
 	if (maxCount <= 1) {
 		maxCount = 1;
 	}
-	if (maxConcavity <= hacd::HaF32 (1.0e-5f)) {
+	if (maxConcavity <= hacd::HaF32 (1.0e-5f)) 
+	{
 		maxConcavity = hacd::HaF32 (1.0e-5f);
 	}
-	dgMeshEffect* const convexPartion = HACD_NEW(dgMeshEffect)(triangleMesh, maxConcavity, maxCount, callback);
+	dgMeshEffect* const convexPartion = HACD_NEW(dgMeshEffect)(*this, maxConcavity, maxCount,callback );
 	return convexPartion;
 }
+
