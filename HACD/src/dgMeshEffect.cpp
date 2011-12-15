@@ -3782,7 +3782,7 @@ dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconca
 		progress = (((hacd::HaF32)heap.Value() - startConcavity) / targetRange) * 100.0f;
 		if ((progress-progressOld) > ptgStep && callback)
 		{
-			sprintf_s(msg, "%3.2f %% \t \t \r", progress);
+			HACD_SPRINTF_S(msg, "%3.2f %% \t \t \r", progress);
 			callback->ReportProgress(msg, progress);
 			progressOld = progress;
 		}
@@ -3875,7 +3875,7 @@ dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconca
 	/*
 	if (callback)
 	{
-		sprintf_s(msg, "# clusters =  %lu \t C = %f\n", static_cast<unsigned long>(essencialClustersCount), heap.Value());
+		HACD_SPRINTF_S(msg, "# clusters =  %lu \t C = %f\n", static_cast<unsigned long>(essencialClustersCount), heap.Value());
 		(*callback)(msg, 0.0f);
 	}*/
 
