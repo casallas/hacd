@@ -3678,7 +3678,7 @@ class dgClusterList: public dgList<dgClusterFace>
 	  hacd::HaF64 m_perimeter;
 };
 
-dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconcavity, hacd::HaI32 maxCount, hacd::CallBackFunction callback) 
+dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconcavity, hacd::HaI32 maxCount, hacd::ICallback* callback) 
 	:dgPolyhedra()
 {
 	Init(true);
@@ -3751,7 +3751,7 @@ dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconca
 	meshMask = mesh.IncLRU();
 
 	if (callback)
-		(callback)("+ Calculating initial cost\n", 0.0);
+		callback->ReportProgress("+ Calculating initial cost\n", 0.0);
 
 	// calculate all the initial cost of all clusters, which at this time are all a single faces
 	for (hacd::HaI32 faceIndex = 1; faceIndex < faceCount; faceIndex++) {
@@ -3770,7 +3770,7 @@ dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconca
 		targetRange = 1.0f;
 
 	if (callback)
-		(callback)("+ Merging Clusters\n", 0.0);
+		callback->ReportProgress("+ Merging Clusters\n", 0.0);
 
 	// calculate all essential convex clusters by merging the all possible clusters according 
 	// which combined concavity es lower that the max absolute concavity 
@@ -3783,7 +3783,7 @@ dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconca
 		if ((progress-progressOld) > ptgStep && callback)
 		{
 			sprintf_s(msg, "%3.2f %% \t \t \r", progress);
-			(*callback)(msg, progress);
+			callback->ReportProgress(msg, progress);
 			progressOld = progress;
 		}
 
@@ -3925,7 +3925,7 @@ maxCount = 1;
 */
 
 	if (callback)
-		(callback)("+ Generating Hulls\n", 0.0);
+		callback->ReportProgress("+ Generating Hulls\n", 0.0);
 
 	BeginPolygon();
 	hacd::HaF32 layer = hacd::HaF32(0.0f);
@@ -3989,7 +3989,7 @@ maxCount = 1;
 }
 
 
-dgMeshEffect* dgMeshEffect::CreateConvexApproximation(hacd::HaF32 maxConcavity, hacd::HaI32 maxCount, hacd::CallBackFunction callback) const
+dgMeshEffect* dgMeshEffect::CreateConvexApproximation(hacd::HaF32 maxConcavity, hacd::HaI32 maxCount, hacd::ICallback* callback) const
 {
 	dgMeshEffect triangleMesh(*this);
 	if (maxCount <= 1) {

@@ -70,10 +70,14 @@ int getIntArg(int arg,int argc,const char **argv)
 	return ret;
 }
 
-extern "C" void hacdCallback(const char *message, hacd::HaF32 progress)
+class MyCallback : public hacd::ICallback
 {
-	std::cout << message;
-}
+public:
+	virtual void ReportProgress(const char* message, hacd::HaF32 progress)
+	{
+		std::cout << message;
+	}
+};
 
 void main(int argc,const char ** argv)
 {
@@ -133,6 +137,7 @@ void main(int argc,const char ** argv)
 		HACD::gHACD = HACD::createHACD_API();
 		if  ( HACD::gHACD )
 		{
+			MyCallback callback;
 			WavefrontObj obj;
 			unsigned int tcount = obj.loadObj(wavefront,false);
 			if ( tcount )
@@ -142,7 +147,7 @@ void main(int argc,const char ** argv)
 				desc.mIndices = (hacd::HaU32 *)obj.mIndices;
 				desc.mVertices = obj.mVertices;
 			}
-			desc.mCallback = static_cast<hacd::CallBackFunction>(&hacdCallback);
+			desc.mCallback = static_cast<hacd::ICallback*>(&callback);
 			if ( desc.mTriangleCount )
 			{
 				printf("Performing HACD on %d input triangles.\r\n", desc.mTriangleCount );

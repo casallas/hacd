@@ -56,7 +56,7 @@ public:
 		hacd::HaU32			mMaxHullVertices;
 		hacd::HaF32			mConcavity;
 		hacd::HaF32			mSmallClusterThreshold;
-		hacd::CallBackFunction	mCallback;
+		hacd::ICallback*	mCallback;
 		void init(void)
 		{
 			mTriangleCount = 0;

@@ -121,7 +121,7 @@ class dgMeshEffect: public dgPolyhedra, public dgRefCounter, public UANS::UserAl
 	dgMeshEffect (const hacd::HaF64* const vertexCloud, hacd::HaI32 count, hacd::HaI32 strideInByte, hacd::HaF64 distTol);
 
 	// create a convex approximation
-	dgMeshEffect (const dgMeshEffect& source, hacd::HaF32 maxConcavity, hacd::HaI32 maxCount = 32, hacd::CallBackFunction callback = NULL);
+	dgMeshEffect (const dgMeshEffect& source, hacd::HaF32 maxConcavity, hacd::HaI32 maxCount = 32, hacd::ICallback* callback = NULL);
 
 	// create a planar Mesh
 	dgMeshEffect(const dgMatrix& planeMatrix, hacd::HaF32 witdth, hacd::HaF32 breadth, hacd::HaI32 material, const dgMatrix& textureMatrix0, const dgMatrix& textureMatrix1);
@@ -204,7 +204,7 @@ class dgMeshEffect: public dgPolyhedra, public dgRefCounter, public UANS::UserAl
 	
 	dgConvexHull3d * dgMeshEffect::CreateConvexHull(hacd::HaF64 tolerance,hacd::HaI32 maxVertexCount) const;
 
-	dgMeshEffect* CreateConvexApproximation (hacd::HaF32 maxConcavity, hacd::HaI32 maxCount = 32, hacd::CallBackFunction callback = NULL) const;
+	dgMeshEffect* CreateConvexApproximation (hacd::HaF32 maxConcavity, hacd::HaI32 maxCount = 32, hacd::ICallback* callback = NULL) const;
 
 	dgVertexAtribute& GetAttribute (hacd::HaI32 index) const;
 	void TransformMesh (const dgMatrix& matrix);
