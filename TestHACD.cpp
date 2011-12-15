@@ -73,6 +73,12 @@ int getIntArg(int arg,int argc,const char **argv)
 class MyCallback : public hacd::ICallback
 {
 public:
+	virtual bool Cancelled()
+	{
+		// Don't have a cancel button in the test console app.
+		return false;
+	}
+
 	virtual void ReportProgress(const char* message, hacd::HaF32 progress)
 	{
 		std::cout << message;

@@ -3117,13 +3117,13 @@ class dgClusterList: public dgList<dgClusterFace>
 	  hacd::HaF64 m_perimeter;
 };
 
-dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 normalizedConcavity, hacd::HaI32 maxCount, hacd::CallBackFunction callback) 
+dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 normalizedConcavity, hacd::HaI32 maxCount, hacd::ICallback* callback) 
 	:dgPolyhedra()
 {
 
 	if (callback)
 	{
-		(callback)("+ Calculating initial cost\n", 0.0);
+		callback->ReportProgress("+ Calculating initial cost\n", 0.0);
 	}
 
 	Init(true);
@@ -3217,7 +3217,7 @@ dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 normalizedCon
 
 	if (callback)
 	{
-		(callback)("+ Merging Clusters\n",percent);
+		callback->ReportProgress("+ Merging Clusters\n",percent);
 	}
 	
 	hacd::HaI32 essentialClustersCount = faceCount - 1;
@@ -3238,7 +3238,7 @@ dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 normalizedCon
 		{
 			char msg[512];
 			HACD_SPRINTF_S(msg,512, "%3.2f %% \t \t \r", percent);
-			(*callback)(msg, percent);
+			callback->ReportProgress(msg, percent);
 		}
 		// this means that Khaled Mamou flat (perimeter^ / area) is not really a gradient function
 		// which mean the each time two collapse were fused the need on  the they combined concavity could increase 
@@ -3267,11 +3267,6 @@ dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 normalizedCon
 														vertexMark, vertexPool, vertexMarks, diagonalInv, aspectRatioCoeficent, proxyList);
 	}
 
-	if (callback)
-	{
-		(callback)("+ Producing output convex hulls\n", 0.0);
-	}
-
 	BeginPolygon();
 	hacd::HaF32 layer = hacd::HaF32(0.0f);
 
@@ -3281,6 +3276,10 @@ dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 normalizedCon
 	for (hacd::HaI32 i = 0; i < faceCount; i++) 
 	{
 		dgClusterList& clusterList = clusters[i];
+
+		if (callback)
+			callback->ReportProgress("+ Generating Hulls", (i / (float)faceCount) * 100.0f);
+
 
 		if (clusterList.GetCount())	
 		{
@@ -3334,7 +3333,7 @@ dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 normalizedCon
 }
 
 
-dgMeshEffect* dgMeshEffect::CreateConvexApproximation(hacd::HaF32 maxConcavity, hacd::HaI32 maxCount, hacd::CallBackFunction callback) const
+dgMeshEffect* dgMeshEffect::CreateConvexApproximation(hacd::HaF32 maxConcavity, hacd::HaI32 maxCount, hacd::ICallback* callback) const
 {
 	if (maxCount <= 1) {
 		maxCount = 1;
@@ -3787,6 +3786,16 @@ dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconca
 			progressOld = progress;
 		}
 
+		// Bail out if we receive a cancel.
+		if (callback->Cancelled())
+		{
+			for (hacd::HaI32 i = 0; i < faceCount; i++) 
+			{
+				clusters[i].RemoveAll();
+			}
+			return;
+		}	
+
 		dgList<dgPairProxi>::dgListNode* const pairNode = heap[0];
 		heap.Pop();
 		dgPairProxi& pair = pairNode->GetInfo();
@@ -3923,9 +3932,9 @@ maxCount = 1;
 		}
 	}
 */
-
 	if (callback)
-		callback->ReportProgress("+ Generating Hulls\n", 0.0);
+		callback->ReportProgress("+ Generating hulls\n", 0.0);
+
 
 	BeginPolygon();
 	hacd::HaF32 layer = hacd::HaF32(0.0f);
@@ -3933,8 +3942,15 @@ maxCount = 1;
 	dgVertexAtribute polygon[256];
 	memset(polygon, 0, sizeof(polygon));
 	dgArray<dgBigVector> convexVertexBuffer(1024);
-	for (hacd::HaI32 i = 0; i < faceCount; i++) {
+	for (hacd::HaI32 i = 0; i < faceCount; i++) 
+	{
 		dgClusterList& clusterList = clusters[i];
+
+		if (callback)
+		{
+			sprintf_s(msg, "%3.2f %% \t \t \r", (i / (float)faceCount) * 100.0f);
+			callback->ReportProgress(msg, progress);
+		}
 
 		if (clusterList.GetCount())	{
 			hacd::HaI32 count = 0;

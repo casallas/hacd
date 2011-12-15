@@ -118,6 +118,7 @@ namespace hacd
 	{
 	public:
 		virtual void ReportProgress(const char *, HaF32 progress) = 0;
+		virtual bool Cancelled() = 0;
 	};
 
 #define HACD_NEW(T) new(#T,__FILE__,__LINE__,sizeof(T)) T

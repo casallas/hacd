@@ -150,8 +150,8 @@ public:
 			}
 		}
 
-		if (desc.mCallback)
-			desc.mCallback->ReportProgress("+ Merging Hulls\n", 0.0);
+		//if (desc.mCallback)
+		//	desc.mCallback->ReportProgress("+ Merging Hulls\n", 99.0f);
 
 		if ( ret && ((ret > desc.mMaxMergeHullCount) || 
 			(desc.mSmallClusterThreshold != 0.0f)) )
