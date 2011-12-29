@@ -3781,7 +3781,7 @@ dgMeshEffect::dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconca
 		progress = (((hacd::HaF32)heap.Value() - startConcavity) / targetRange) * 100.0f;
 		if ((progress-progressOld) > ptgStep && callback)
 		{
-			HACD_SPRINTF_S(msg, "%3.2f %% \t \t \r", progress);
+			HACD_SPRINTF_S(msg,1024, "%3.2f %% \t \t \r", progress);
 			callback->ReportProgress(msg, progress);
 			progressOld = progress;
 		}
