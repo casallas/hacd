@@ -38,7 +38,7 @@
 
 #define DG_STACK_DEPTH 63
 
-#ifdef WIN32
+#ifdef HACD_WINDOWS
 #pragma warning (disable: 4201)//nonstandard extension used : nameless struct/union
 #endif
 
@@ -599,7 +599,7 @@ class dgAABBTree
 		return count;
 	}
 
-	DG_INLINE hacd::HaI32 BoxIntersectSimd (const dgTriplex* const vertexArray, const dgVector& min, const dgVector& max) const
+	HACD_FORCE_INLINE hacd::HaI32 BoxIntersectSimd (const dgTriplex* const vertexArray, const dgVector& min, const dgVector& max) const
 	{
 		simd_128 minBox(&vertexArray[m_minIndex].m_x);
 		simd_128 maxBox(&vertexArray[m_maxIndex].m_x);
@@ -607,7 +607,7 @@ class dgAABBTree
 	}
 
 
-	DG_INLINE hacd::HaI32 BoxIntersect (const dgTriplex* const vertexArray, const dgVector& min, const dgVector& max) const
+	HACD_FORCE_INLINE hacd::HaI32 BoxIntersect (const dgTriplex* const vertexArray, const dgVector& min, const dgVector& max) const
 	{
 		dgVector boxP0 (vertexArray[m_minIndex].m_x, vertexArray[m_minIndex].m_y, vertexArray[m_minIndex].m_z, hacd::HaF32 (0.0f));
 		dgVector boxP1 (vertexArray[m_maxIndex].m_x, vertexArray[m_maxIndex].m_y, vertexArray[m_maxIndex].m_z, hacd::HaF32 (0.0f));
@@ -615,7 +615,7 @@ class dgAABBTree
 	}
 
 
-	DG_INLINE hacd::HaI32 RayTestSimd (const dgFastRayTest& ray, const dgTriplex* const vertexArray) const
+	HACD_FORCE_INLINE hacd::HaI32 RayTestSimd (const dgFastRayTest& ray, const dgTriplex* const vertexArray) const
 	{
 		simd_128 minBox (&vertexArray[m_minIndex].m_x);
 		simd_128 maxBox (&vertexArray[m_maxIndex].m_x);
@@ -639,7 +639,7 @@ class dgAABBTree
 		return (t0 < t1).GetInt();
 	}
 
-	DG_INLINE hacd::HaI32 RayTest (const dgFastRayTest& ray, const dgTriplex* const vertexArray) const
+	HACD_FORCE_INLINE hacd::HaI32 RayTest (const dgFastRayTest& ray, const dgTriplex* const vertexArray) const
 	{
 		hacd::HaF32 tmin = 0.0f;          
 		hacd::HaF32 tmax = 1.0f;

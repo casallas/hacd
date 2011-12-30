@@ -159,7 +159,7 @@ hacd::HaI32 dgApi dgConvexIntersection (const dgVector convexPolyA[], hacd::HaI3
 */
 
 
-DG_INLINE hacd::HaI32 dgOverlapTestSimd (const dgVector& p0, const dgVector& p1, const dgVector& q0, const dgVector& q1)
+HACD_FORCE_INLINE hacd::HaI32 dgOverlapTestSimd (const dgVector& p0, const dgVector& p1, const dgVector& q0, const dgVector& q1)
 {
 //	HACD_ASSERT (p0.m_w == hacd::HaF32 (0.0f));
 //	HACD_ASSERT (p1.m_w == hacd::HaF32 (0.0f));
@@ -170,13 +170,13 @@ DG_INLINE hacd::HaI32 dgOverlapTestSimd (const dgVector& p0, const dgVector& p1,
 	return ((mask & 0x07) == 0x07);
 }
 
-DG_INLINE hacd::HaI32 dgOverlapTest (const dgVector& p0, const dgVector& p1, const dgVector& q0, const dgVector& q1)
+HACD_FORCE_INLINE hacd::HaI32 dgOverlapTest (const dgVector& p0, const dgVector& p1, const dgVector& q0, const dgVector& q1)
 {
 	return ((p0.m_x < q1.m_x) && (p1.m_x > q0.m_x) && (p0.m_z < q1.m_z) && (p1.m_z > q0.m_z) && (p0.m_y < q1.m_y) && (p1.m_y > q0.m_y)); 
 }
 
 
-DG_INLINE hacd::HaI32 dgBoxInclusionTestSimd (const dgVector& p0, const dgVector& p1, const dgVector& q0, const dgVector& q1)
+HACD_FORCE_INLINE hacd::HaI32 dgBoxInclusionTestSimd (const dgVector& p0, const dgVector& p1, const dgVector& q0, const dgVector& q1)
 {
 	HACD_ASSERT (p0.m_w == hacd::HaF32 (0.0f));
 	HACD_ASSERT (p1.m_w == hacd::HaF32 (0.0f));
@@ -187,13 +187,13 @@ DG_INLINE hacd::HaI32 dgBoxInclusionTestSimd (const dgVector& p0, const dgVector
 	return ((mask & 0x07) == 0x07);
 }
 
-DG_INLINE hacd::HaI32 dgBoxInclusionTest (const dgVector& p0, const dgVector& p1, const dgVector& q0, const dgVector& q1)
+HACD_FORCE_INLINE hacd::HaI32 dgBoxInclusionTest (const dgVector& p0, const dgVector& p1, const dgVector& q0, const dgVector& q1)
 {
 	return (p0.m_x >= q0.m_x) && (p0.m_y >= q0.m_y) && (p0.m_z >= q0.m_z) && (p1.m_x <= q1.m_x) && (p1.m_y <= q1.m_y) && (p1.m_z <= q1.m_z);
 }
 
 
-DG_INLINE hacd::HaI32 dgCompareBox (const dgVector& p0, const dgVector& p1, const dgVector& q0, const dgVector& q1)
+HACD_FORCE_INLINE hacd::HaI32 dgCompareBox (const dgVector& p0, const dgVector& p1, const dgVector& q0, const dgVector& q1)
 {
 	return (p0.m_x != q0.m_x) || (p0.m_y != q0.m_y) || (p0.m_z != q0.m_z) || (p1.m_x != q1.m_x) || (p1.m_y != q1.m_y) || (p1.m_z != q1.m_z);
 }

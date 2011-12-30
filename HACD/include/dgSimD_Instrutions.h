@@ -80,23 +80,23 @@
 		class simd_128
 		{
 			public:
-			DG_INLINE simd_128 () {}
-			DG_INLINE simd_128 (vFloat type): m_type(type) {}
-			DG_INLINE simd_128 (hacd::HaF32 a): m_type((vFloat) (a, a, a, a)) {}
-			DG_INLINE simd_128 (const simd_128& data): m_type(data.m_type) {}
-			DG_INLINE simd_128 (hacd::HaI32 a) : m_type ((vFloat) (hacd::HaF32 (*(hacd::HaF32*)&a), hacd::HaF32 (*(hacd::HaF32*)&a), hacd::HaF32 (*(hacd::HaF32*)&a), hacd::HaF32 (*(hacd::HaF32*)&a))) {}
-			DG_INLINE simd_128 (const hacd::HaF32* const ptr): m_type((vFloat) (hacd::HaF32 (ptr[0]), hacd::HaF32 (ptr[1]), hacd::HaF32 (ptr[2]), hacd::HaF32 (ptr[3]))) {}
-			DG_INLINE simd_128 (hacd::HaF32 x, hacd::HaF32 y, hacd::HaF32 z, hacd::HaF32 w): m_type((vFloat) (x, y, z, w)) {}
-			DG_INLINE simd_128 (hacd::HaI32 ix, hacd::HaI32 iy, hacd::HaI32 iz, hacd::HaI32 iw): m_type((vFloat) (hacd::HaF32 (*(hacd::HaF32*)&ix), hacd::HaF32 (*(hacd::HaF32*)&iy), hacd::HaF32 (*(hacd::HaF32*)&iz), hacd::HaF32 (*(hacd::HaF32*)&iw))) {}
+			HACD_FORCE_INLINE simd_128 () {}
+			HACD_FORCE_INLINE simd_128 (vFloat type): m_type(type) {}
+			HACD_FORCE_INLINE simd_128 (hacd::HaF32 a): m_type((vFloat) (a, a, a, a)) {}
+			HACD_FORCE_INLINE simd_128 (const simd_128& data): m_type(data.m_type) {}
+			HACD_FORCE_INLINE simd_128 (hacd::HaI32 a) : m_type ((vFloat) (hacd::HaF32 (*(hacd::HaF32*)&a), hacd::HaF32 (*(hacd::HaF32*)&a), hacd::HaF32 (*(hacd::HaF32*)&a), hacd::HaF32 (*(hacd::HaF32*)&a))) {}
+			HACD_FORCE_INLINE simd_128 (const hacd::HaF32* const ptr): m_type((vFloat) (hacd::HaF32 (ptr[0]), hacd::HaF32 (ptr[1]), hacd::HaF32 (ptr[2]), hacd::HaF32 (ptr[3]))) {}
+			HACD_FORCE_INLINE simd_128 (hacd::HaF32 x, hacd::HaF32 y, hacd::HaF32 z, hacd::HaF32 w): m_type((vFloat) (x, y, z, w)) {}
+			HACD_FORCE_INLINE simd_128 (hacd::HaI32 ix, hacd::HaI32 iy, hacd::HaI32 iz, hacd::HaI32 iw): m_type((vFloat) (hacd::HaF32 (*(hacd::HaF32*)&ix), hacd::HaF32 (*(hacd::HaF32*)&iy), hacd::HaF32 (*(hacd::HaF32*)&iz), hacd::HaF32 (*(hacd::HaF32*)&iw))) {}
 
 /*
-			DG_INLINE hacd::HaI32 GetInt () const
+			HACD_FORCE_INLINE hacd::HaI32 GetInt () const
 			{
 				return _mm_cvtss_si32(m_type);
 			}
 */
 
-			DG_INLINE void StoreScalar(float* const scalar) const
+			HACD_FORCE_INLINE void StoreScalar(float* const scalar) const
 			{
 				//_mm_store_ss (scalar, m_type);
 				vFloatTuple tmp;
@@ -105,81 +105,81 @@
 			}
 			
 /*
-			DG_INLINE void StoreVector(float* const array) const
+			HACD_FORCE_INLINE void StoreVector(float* const array) const
 			{
 				_mm_storeu_ps (array, m_type);
 			}
 
-			DG_INLINE simd_128 operator= (const simd_128& data)
+			HACD_FORCE_INLINE simd_128 operator= (const simd_128& data)
 			{
 				m_type = data.m_type;
 				return (*this);
 			}
 */
 
-			DG_INLINE simd_128 operator+ (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 operator+ (const simd_128& data) const
 			{
 				//return _mm_add_ps (m_type, data.m_type);
 				return vec_add (m_type, data.m_type);	
 			}
 
-			DG_INLINE simd_128 operator- (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 operator- (const simd_128& data) const
 			{
 				//return _mm_sub_ps (m_type, data.m_type);
 				return vec_sub (m_type, data.m_type);	
 			}
 
-			DG_INLINE simd_128 operator* (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 operator* (const simd_128& data) const
 			{
 				//return _mm_mul_ps (m_type, data.m_type);
 				return vec_madd (m_type, data.m_type, (vFloat) (hacd::HaF32 (0.0f), hacd::HaF32 (0.0f), hacd::HaF32 (0.0f), hacd::HaF32 (0.0f)));	
 			}
 
 /*
-			DG_INLINE simd_128 operator/ (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 operator/ (const simd_128& data) const
 			{
 				return _mm_div_ps (m_type, data.m_type);	
 			}
 
 
 
-			DG_INLINE simd_128 operator<= (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 operator<= (const simd_128& data) const
 			{
 				return _mm_cmple_ps (m_type, data.m_type);	
 			}
 
-			DG_INLINE simd_128 operator>= (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 operator>= (const simd_128& data) const
 			{
 				return _mm_cmpge_ps (m_type, data.m_type);	
 			}
 
-			DG_INLINE simd_128 operator< (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 operator< (const simd_128& data) const
 			{
 				return _mm_cmplt_ps (m_type, data.m_type);	
 			}
 
-			DG_INLINE simd_128 operator> (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 operator> (const simd_128& data) const
 			{
 				return _mm_cmpgt_ps (m_type, data.m_type);	
 			}
 
 
-			DG_INLINE simd_128 operator& (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 operator& (const simd_128& data) const
 			{
 				return _mm_and_ps (m_type, data.m_type);	
 			}
 
-			DG_INLINE simd_128 operator| (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 operator| (const simd_128& data) const
 			{
 				return _mm_or_ps (m_type, data.m_type);	
 			}
 
-			DG_INLINE simd_128 AndNot (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 AndNot (const simd_128& data) const
 			{
 				return _mm_andnot_ps (data.m_type, m_type);	
 			}
 */		
-			DG_INLINE simd_128 AddHorizontal () const
+			HACD_FORCE_INLINE simd_128 AddHorizontal () const
 			{
 				//simd_128 tmp (_mm_add_ps (m_type, _mm_shuffle_ps(m_type, m_type, PURMUT_MASK(2, 3, 0, 1))));
 				//return _mm_add_ps (tmp.m_type, _mm_shuffle_ps(tmp.m_type, tmp.m_type, PURMUT_MASK(1, 0, 3, 2)));
@@ -188,14 +188,14 @@
 			}
 
 
-			DG_INLINE simd_128 DotProduct (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 DotProduct (const simd_128& data) const
 			{
 				simd_128 dot ((*this) * data);
 				return dot.AddHorizontal();
 			}
 
 
-			DG_INLINE simd_128 CrossProduct (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 CrossProduct (const simd_128& data) const
 			{
 //				return _mm_sub_ps (_mm_mul_ps (_mm_shuffle_ps (m_type, m_type, PURMUT_MASK(3, 0, 2, 1)), _mm_shuffle_ps (data.m_type, data.m_type, PURMUT_MASK(3, 1, 0, 2))),
 //								   _mm_mul_ps (_mm_shuffle_ps (m_type, m_type, PURMUT_MASK(3, 1, 0, 2)), _mm_shuffle_ps (data.m_type, data.m_type, PURMUT_MASK(3, 0, 2, 1))));
@@ -209,13 +209,13 @@
 
 /*
 
-			DG_INLINE simd_128 Abs () const
+			HACD_FORCE_INLINE simd_128 Abs () const
 			{
 				__m128i shitSign = _mm_srli_epi32 (_mm_slli_epi32 (*((__m128i*) &m_type), 1), 1);
 				return *(__m128*)&shitSign;
 			}
 
-			DG_INLINE simd_128 Floor () const
+			HACD_FORCE_INLINE simd_128 Floor () const
 			{
 				//const hacd::HaF32 magicConst = ;
 				simd_128 mask ((hacd::HaF32 (1.5f) * hacd::HaF32 (1<<23)));
@@ -229,12 +229,12 @@
 				return ret;
 			}
 			
-			DG_INLINE hacd::HaI32 GetSignMask() const
+			HACD_FORCE_INLINE hacd::HaI32 GetSignMask() const
 			{
 				return _mm_movemask_ps(m_type);
 			} 
 
-			DG_INLINE simd_128 InvSqrt () const
+			HACD_FORCE_INLINE simd_128 InvSqrt () const
 			{
 				simd_128 half (hacd::HaF32 (0.5f));
 				simd_128 three (hacd::HaF32 (3.0f));
@@ -242,53 +242,53 @@
 				return half * tmp0 * (three - (*this) * tmp0 * tmp0);
 			}
 
-			DG_INLINE simd_128 GetMin (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 GetMin (const simd_128& data) const
 			{
 				return _mm_min_ps (m_type, data.m_type);
 			} 
 
-			DG_INLINE simd_128 GetMax (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 GetMax (const simd_128& data) const
 			{
 				return _mm_max_ps (m_type, data.m_type);
 			} 
 
-			DG_INLINE simd_128 MaximunValue() const
+			HACD_FORCE_INLINE simd_128 MaximunValue() const
 			{
 				simd_128 tmp (GetMax (_mm_movehl_ps (m_type, m_type)));
 				return tmp.GetMax (_mm_shuffle_ps(tmp.m_type, tmp.m_type, PURMUT_MASK(0, 0, 0, 1)));
 			}
 
 */
-			DG_INLINE simd_128 MoveHighToLow (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 MoveHighToLow (const simd_128& data) const
 			{
 				//return _mm_movehl_ps (m_type, data.m_type);
 				return vec_perm (m_type, data.m_type, PURMUT_MASK(7, 6, 3, 2));
 			}
 
-			DG_INLINE simd_128 MoveLowToHigh (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 MoveLowToHigh (const simd_128& data) const
 			{
 				//return _mm_movelh_ps (m_type, data.m_type);
 				return vec_perm (m_type, data.m_type, PURMUT_MASK(5, 4, 1, 0));
 			}
 
-			DG_INLINE simd_128 PackLow (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 PackLow (const simd_128& data) const
 			{
 				return vec_perm (m_type, data.m_type, PURMUT_MASK(5, 1, 4, 0));
 			}
 
-			DG_INLINE simd_128 PackHigh (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 PackHigh (const simd_128& data) const
 			{
 				//return _mm_unpackhi_ps (m_type, data.m_type);
 				return vec_perm (m_type, data.m_type, PURMUT_MASK(5, 6, 3, 2));
 			}
 
 /*
-			DG_INLINE simd_128 ShiftTripleRight () const
+			HACD_FORCE_INLINE simd_128 ShiftTripleRight () const
 			{
 				return _mm_shuffle_ps(m_type, m_type, PURMUT_MASK(3, 1, 0, 2));
 			}
 
-			DG_INLINE simd_128 ShiftTripleLeft () const
+			HACD_FORCE_INLINE simd_128 ShiftTripleLeft () const
 			{
 				return _mm_shuffle_ps(m_type, m_type, PURMUT_MASK(3, 0, 2, 1));
 			}
@@ -310,119 +310,119 @@
 		class simd_128
 		{
 			public:
-			DG_INLINE simd_128 () {}
-			DG_INLINE simd_128 (__m128 type): m_type(type) {}
-			DG_INLINE simd_128 (hacd::HaF32 a): m_type(_mm_set_ps1(a)) {}
-			DG_INLINE simd_128 (const simd_128& data): m_type(data.m_type) {}
-			DG_INLINE simd_128 (hacd::HaI32 a): m_type (_mm_set_ps1 (*(hacd::HaF32*)&a)){}
-			DG_INLINE simd_128 (const hacd::HaF32* const ptr): m_type(_mm_loadu_ps (ptr)) {}
-			DG_INLINE simd_128 (hacd::HaF32 x, hacd::HaF32 y, hacd::HaF32 z, hacd::HaF32 w): m_type(_mm_set_ps(w, z, y, x)) {}
-			DG_INLINE simd_128 (hacd::HaI32 ix, hacd::HaI32 iy, hacd::HaI32 iz, hacd::HaI32 iw): m_type(_mm_set_ps(*(hacd::HaF32*)&iw, *(hacd::HaF32*)&iz, *(hacd::HaF32*)&iy, *(hacd::HaF32*)&ix)) {}
+			HACD_FORCE_INLINE simd_128 () {}
+			HACD_FORCE_INLINE simd_128 (__m128 type): m_type(type) {}
+			HACD_FORCE_INLINE simd_128 (hacd::HaF32 a): m_type(_mm_set_ps1(a)) {}
+			HACD_FORCE_INLINE simd_128 (const simd_128& data): m_type(data.m_type) {}
+			HACD_FORCE_INLINE simd_128 (hacd::HaI32 a): m_type (_mm_set_ps1 (*(hacd::HaF32*)&a)){}
+			HACD_FORCE_INLINE simd_128 (const hacd::HaF32* const ptr): m_type(_mm_loadu_ps (ptr)) {}
+			HACD_FORCE_INLINE simd_128 (hacd::HaF32 x, hacd::HaF32 y, hacd::HaF32 z, hacd::HaF32 w): m_type(_mm_set_ps(w, z, y, x)) {}
+			HACD_FORCE_INLINE simd_128 (hacd::HaI32 ix, hacd::HaI32 iy, hacd::HaI32 iz, hacd::HaI32 iw): m_type(_mm_set_ps(*(hacd::HaF32*)&iw, *(hacd::HaF32*)&iz, *(hacd::HaF32*)&iy, *(hacd::HaF32*)&ix)) {}
 			
-			DG_INLINE hacd::HaI32 GetInt () const
+			HACD_FORCE_INLINE hacd::HaI32 GetInt () const
 			{
 				return _mm_cvtss_si32(m_type);
 			}
 
-			DG_INLINE void StoreScalar(float* const scalar) const
+			HACD_FORCE_INLINE void StoreScalar(float* const scalar) const
 			{
 				_mm_store_ss (scalar, m_type);
 			}
 
-			DG_INLINE void StoreVector(float* const array) const
+			HACD_FORCE_INLINE void StoreVector(float* const array) const
 			{
 				_mm_storeu_ps (array, m_type);
 			}
 
-			DG_INLINE simd_128 operator= (const simd_128& data)
+			HACD_FORCE_INLINE simd_128 operator= (const simd_128& data)
 			{
 				m_type = data.m_type;
 				return (*this);
 			}
 
-			DG_INLINE simd_128 operator+ (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 operator+ (const simd_128& data) const
 			{
 				return _mm_add_ps (m_type, data.m_type);	
 			}
 
-			DG_INLINE simd_128 operator- (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 operator- (const simd_128& data) const
 			{
 				return _mm_sub_ps (m_type, data.m_type);	
 			}
 
-			DG_INLINE simd_128 operator* (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 operator* (const simd_128& data) const
 			{
 				return _mm_mul_ps (m_type, data.m_type);	
 			}
 
-			DG_INLINE simd_128 operator/ (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 operator/ (const simd_128& data) const
 			{
 				return _mm_div_ps (m_type, data.m_type);	
 			}
 
 
 
-			DG_INLINE simd_128 operator<= (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 operator<= (const simd_128& data) const
 			{
 				return _mm_cmple_ps (m_type, data.m_type);	
 			}
 
-			DG_INLINE simd_128 operator>= (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 operator>= (const simd_128& data) const
 			{
 				return _mm_cmpge_ps (m_type, data.m_type);	
 			}
 
-			DG_INLINE simd_128 operator< (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 operator< (const simd_128& data) const
 			{
 				return _mm_cmplt_ps (m_type, data.m_type);	
 			}
 
-			DG_INLINE simd_128 operator> (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 operator> (const simd_128& data) const
 			{
 				return _mm_cmpgt_ps (m_type, data.m_type);	
 			}
 
 
-			DG_INLINE simd_128 operator& (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 operator& (const simd_128& data) const
 			{
 				return _mm_and_ps (m_type, data.m_type);	
 			}
 
-			DG_INLINE simd_128 operator| (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 operator| (const simd_128& data) const
 			{
 				return _mm_or_ps (m_type, data.m_type);	
 			}
 
-			DG_INLINE simd_128 AndNot (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 AndNot (const simd_128& data) const
 			{
 				return _mm_andnot_ps (data.m_type, m_type);	
 			}
 		
-			DG_INLINE simd_128 AddHorizontal () const
+			HACD_FORCE_INLINE simd_128 AddHorizontal () const
 			{
 				simd_128 tmp (_mm_add_ps (m_type, _mm_shuffle_ps(m_type, m_type, PURMUT_MASK(2, 3, 0, 1))));
 				return _mm_add_ps (tmp.m_type, _mm_shuffle_ps(tmp.m_type, tmp.m_type, PURMUT_MASK(1, 0, 3, 2)));
 			}
 
-			DG_INLINE simd_128 DotProduct (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 DotProduct (const simd_128& data) const
 			{
 				simd_128 dot ((*this) * data);
 				return dot.AddHorizontal();
 			}
 
-			DG_INLINE simd_128 CrossProduct (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 CrossProduct (const simd_128& data) const
 			{
 				return _mm_sub_ps (_mm_mul_ps (_mm_shuffle_ps (m_type, m_type, PURMUT_MASK(3, 0, 2, 1)), _mm_shuffle_ps (data.m_type, data.m_type, PURMUT_MASK(3, 1, 0, 2))),
 								   _mm_mul_ps (_mm_shuffle_ps (m_type, m_type, PURMUT_MASK(3, 1, 0, 2)), _mm_shuffle_ps (data.m_type, data.m_type, PURMUT_MASK(3, 0, 2, 1))));
 			}
 
-			DG_INLINE simd_128 Abs () const
+			HACD_FORCE_INLINE simd_128 Abs () const
 			{
 				__m128i shitSign = _mm_srli_epi32 (_mm_slli_epi32 (*((__m128i*) &m_type), 1), 1);
 				return *(__m128*)&shitSign;
 			}
 
-			DG_INLINE simd_128 Floor () const
+			HACD_FORCE_INLINE simd_128 Floor () const
 			{
 				//const hacd::HaF32 magicConst = ;
 				simd_128 mask ((hacd::HaF32 (1.5f) * hacd::HaF32 (1<<23)));
@@ -436,12 +436,12 @@
 				return ret;
 			}
 			
-			DG_INLINE hacd::HaI32 GetSignMask() const
+			HACD_FORCE_INLINE hacd::HaI32 GetSignMask() const
 			{
 				return _mm_movemask_ps(m_type);
 			} 
 
-			DG_INLINE simd_128 InvSqrt () const
+			HACD_FORCE_INLINE simd_128 InvSqrt () const
 			{
 				simd_128 half (hacd::HaF32 (0.5f));
 				simd_128 three (hacd::HaF32 (3.0f));
@@ -449,49 +449,49 @@
 				return half * tmp0 * (three - (*this) * tmp0 * tmp0);
 			}
 
-			DG_INLINE simd_128 GetMin (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 GetMin (const simd_128& data) const
 			{
 				return _mm_min_ps (m_type, data.m_type);
 			} 
 
-			DG_INLINE simd_128 GetMax (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 GetMax (const simd_128& data) const
 			{
 				return _mm_max_ps (m_type, data.m_type);
 			} 
 
-			DG_INLINE simd_128 MaximunValue() const
+			HACD_FORCE_INLINE simd_128 MaximunValue() const
 			{
 				simd_128 tmp (GetMax (_mm_movehl_ps (m_type, m_type)));
 				return tmp.GetMax (_mm_shuffle_ps(tmp.m_type, tmp.m_type, PURMUT_MASK(0, 0, 0, 1)));
 			}
 
 
-			DG_INLINE simd_128 MoveHighToLow (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 MoveHighToLow (const simd_128& data) const
 			{
 				return _mm_movehl_ps (m_type, data.m_type);
 			}
 
-			DG_INLINE simd_128 MoveLowToHigh (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 MoveLowToHigh (const simd_128& data) const
 			{
 				return _mm_movelh_ps (m_type, data.m_type);
 			}
 
-			DG_INLINE simd_128 PackLow (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 PackLow (const simd_128& data) const
 			{
 				return _mm_unpacklo_ps (m_type, data.m_type);
 			}
 
-			DG_INLINE simd_128 PackHigh (const simd_128& data) const
+			HACD_FORCE_INLINE simd_128 PackHigh (const simd_128& data) const
 			{
 				return _mm_unpackhi_ps (m_type, data.m_type);
 			}
 
-			DG_INLINE simd_128 ShiftTripleRight () const
+			HACD_FORCE_INLINE simd_128 ShiftTripleRight () const
 			{
 				return _mm_shuffle_ps(m_type, m_type, PURMUT_MASK(3, 1, 0, 2));
 			}
 
-			DG_INLINE simd_128 ShiftTripleLeft () const
+			HACD_FORCE_INLINE simd_128 ShiftTripleLeft () const
 			{
 				return _mm_shuffle_ps(m_type, m_type, PURMUT_MASK(3, 0, 2, 1));
 			}
@@ -503,7 +503,7 @@
 #endif
 
 
-DG_INLINE void Transpose4x4Simd_128 (simd_128& dst0, simd_128& dst1, simd_128& dst2, simd_128& dst3, 
+HACD_FORCE_INLINE void Transpose4x4Simd_128 (simd_128& dst0, simd_128& dst1, simd_128& dst2, simd_128& dst3, 
 							         const simd_128& src0, const simd_128& src1, const simd_128& src2, const simd_128& src3)
 {
 	simd_128 tmp0 (src0.PackLow(src1));

@@ -23,7 +23,7 @@
 #include "dgTypes.h"
 #include "dgWorkerThread.h"
 
-#if defined(WIN32) || defined(WIN64)
+#ifdef HACD_WINDOWS
 #include <process.h>
 #endif
 
@@ -60,7 +60,7 @@ dgWorkerThread::~dgWorkerThread(void)
 
 
 
-#if (defined (WIN32) || defined (WIN64) || defined (_MINGW_32_VER) || defined (_MINGW_64_VER))
+#if defined(HACD_WINDOWS) || defined(HACD_CYGWIN)
 	#ifdef _DEBUG 
 	#define MS_VC_EXCEPTION 0x406D1388 
 
@@ -107,7 +107,7 @@ void dgWorkerThread::Init (hacd::HaI32 id, hacd::HaU32* const jobQueueCompletedS
 	}
 	m_queue = (dgWorkerThreadJob*) HACD_ALLOC(hacd::HaI32 (m_jobsCapacity * sizeof (dgWorkerThreadJob)));  
 	
-#if (defined (WIN32) || defined (WIN64) || defined (_MINGW_32_VER) || defined (_MINGW_64_VER))
+#if defined(HACD_WINDOWS) || defined(HACD_CYGWIN)
 	m_jobsInQueueSemaphore = CreateSemaphore(NULL, 0, 0x7fffffff, NULL);
 	m_threadhandle = _beginthreadex( NULL, 0, ThreadSystemCallback, this, 0, NULL);
 	#ifdef _DEBUG
@@ -117,7 +117,7 @@ void dgWorkerThread::Init (hacd::HaI32 id, hacd::HaU32* const jobQueueCompletedS
 	#endif
 #endif
 
-#if (defined (_LINUX_VER) || defined (_MAC_VER))
+#if defined(HACD_LINUX) || defined(HACD_APPLE)
 	pthread_create (&m_threadhandle, NULL, ThreadSystemCallback, this);
 #endif
 
@@ -134,14 +134,14 @@ void dgWorkerThread::SetPerfomanceCounter(OnGetPerformanceCountCallback callback
 
 
 
-#if (defined (WIN32) || defined (WIN64) || defined (_MINGW_32_VER) || defined (_MINGW_64_VER))
+#if defined(HACD_WINDOWS) || defined(HACD_APPLE)
 unsigned _stdcall dgWorkerThread::ThreadSystemCallback(void *param)
 #endif
-#if (defined (_LINUX_VER) || defined (_MAC_VER))
+#if defined(HACD_LINUX) || defined(HACD_APPLE)
 void* dgWorkerThreadOld::ThreadSystemCallback(void *param)
 #endif
 {
-	#if (defined (WIN32) || defined (WIN64))
+	#if defined(HACD_WINDOWS)
 		#ifndef __USE_DOUBLE_PRECISION__
 			hacd::HaU32 controlWorld = dgControlFP (0xffffffff, 0);
 			dgControlFP (_PC_53, _MCW_PC);
@@ -151,7 +151,7 @@ void* dgWorkerThreadOld::ThreadSystemCallback(void *param)
 	dgWorkerThread* const me = (dgWorkerThread*) param;
 	me->TaskExecuter();
 
-	#if (defined (WIN32) || defined (WIN64))
+	#ifdef HACD_WINDOWS
 		#ifndef __USE_DOUBLE_PRECISION__
 			dgControlFP (controlWorld, _MCW_PC);
 		#endif

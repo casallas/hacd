@@ -55,10 +55,10 @@ class dgWorkerThread : public UANS::UserAllocated
 	void RunAllMicroTask();
 	hacd::HaI32 GetNextJob(dgWorkerThreadJob& job);
 
-	#if (defined (WIN32) || defined (WIN64) || defined (_MINGW_32_VER) || defined (_MINGW_64_VER))
+	#if defined(HACD_WINDOWS) || defined(HACD_CYGWIN)
 		static unsigned _stdcall ThreadSystemCallback(void *param);
 	#endif
-	#if (defined (_LINUX_VER) || defined (_MAC_VER))
+	#if defined(HACD_LINUX) || defined(HACD_APPLE)
 		static void* ThreadSystemCallback(void *Param);
 	#endif
 

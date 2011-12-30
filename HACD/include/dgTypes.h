@@ -27,7 +27,7 @@
 #include <math.h>
 #include <float.h>
 
-#if defined(WIN32) || defined(WIN64)
+#ifdef HACD_WINDOWS
 #include <Windows.h>
 #endif
 
@@ -41,7 +41,7 @@ class dgTriplex
 	hacd::HaF32 m_z;
 };
 
-#if (defined (WIN32) || defined (WIN64))
+#ifdef HACD_WINDOWS
 #if (_MSC_VER >= 1400)
 #include <intrin.h>
 #else 
@@ -53,7 +53,7 @@ class dgTriplex
 
 
 
-#ifdef __ppc__
+#ifdef HACD_PPC
 #include <vecLib/veclib.h>
 #endif
 
@@ -65,20 +65,13 @@ class dgTriplex
 typedef hacd::HaU32 (*OnGetPerformanceCountCallback) ();
 
 
-#if (defined (WIN32) || defined (WIN64))
+#ifdef HACD_WINDOWS
 	#define	DG_MSC_VECTOR_ALIGMENT	__declspec(align(16))
 	#define	DG_GCC_VECTOR_ALIGMENT	
 #else
 	#define	DG_MSC_VECTOR_ALIGMENT
 	#define	DG_GCC_VECTOR_ALIGMENT	__attribute__ ((aligned (16)))
 #endif
-
-#if (defined (WIN32) || defined (WIN64))
-#define DG_INLINE __forceinline 
-#else 
-#define DG_INLINE inline 
-#endif
-
 
 #define DG_BUILD_SIMD_CODE
 #define DG_MEMORY_GRANULARITY 16
@@ -540,15 +533,15 @@ HACD_INLINE hacd::HaF32 dgCeil(hacd::HaF32 x)
 
 inline hacd::HaI32 dgAtomicAdd (hacd::HaI32* const addend, hacd::HaI32 amount)
 {
-#if (defined (WIN32) || defined (WIN64) || defined (_MINGW_32_VER) || defined (_MINGW_64_VER))
+#if defined(HACD_WINDOWS) || defined(HACD_CYGWIN)
 	return InterlockedExchangeAdd((long*) addend, long (amount));
 #endif
 
-#if (defined (_LINUX_VER))
+#ifdef HACD_LINUX
 	return __sync_fetch_and_add ((int32_t*)addend, amount );
 #endif
 
-#if (defined (_MAC_VER))
+#ifdef HACD_APPLE
 	hacd::HaI32 count = OSAtomicAdd32 (amount, (int32_t*)addend);
 	return count - *addend;
 #endif
@@ -556,26 +549,26 @@ inline hacd::HaI32 dgAtomicAdd (hacd::HaI32* const addend, hacd::HaI32 amount)
 
 inline hacd::HaI32 dgInterlockedExchange(hacd::HaI32* const ptr, hacd::HaI32 value)
 {
-#if (defined (WIN32) || defined (WIN64) || defined (_MINGW_32_VER) || defined (_MINGW_64_VER))
+#if defined(HACD_WINDOWS) || defined(HACD_CYGWIN)
 	return InterlockedExchange((long*) ptr, value);
 #endif
 
-#if (defined (_LINUX_VER))
+#ifdef HACD_LINUX
 	return __sync_fetch_and_add ((int32_t*)ptr, value );
 #endif
 
-#if (defined (_MAC_VER))
+#ifdef HACD_APPLE
 	return OSAtomicAdd32 (value, (int32_t*)ptr);
 #endif
 }
 
 inline void dgThreadYield()
 {
-#if (defined (WIN32) || defined (WIN64) || defined (_MINGW_32_VER) || defined (_MINGW_64_VER))
+#if defined(HACD_WINDOWS) || defined(HACD_CYGWIN)
 	Sleep(0);
 #endif
 
-#if (defined (_LINUX_VER) || defined (_MAC_VER))
+#if defined(HACD_LINUX) || defined(HACD_APPLE)
 	sched_yield();
 #endif
 }

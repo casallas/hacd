@@ -172,7 +172,7 @@ dgConvexHull3d::~dgConvexHull3d(void)
 
 void dgConvexHull3d::BuildHull (const hacd::HaF64* const vertexCloud, hacd::HaI32 strideInBytes, hacd::HaI32 count, hacd::HaF64 distTol, hacd::HaI32 maxVertexCount)
 {
-#if (defined (WIN32) || defined (WIN64))
+#ifdef HACD_WINDOWS
 	hacd::HaU32 controlWorld = dgControlFP (0xffffffff, 0);
 	dgControlFP (_PC_53, _MCW_PC);
 #endif
@@ -191,7 +191,7 @@ void dgConvexHull3d::BuildHull (const hacd::HaF64* const vertexCloud, hacd::HaI3
 		CalculateConvexHull (&treePool[0], &points[0], count, distTol, maxVertexCount);
 	}
 
-#if (defined (WIN32) || defined (WIN64))
+#ifdef HACD_WINDOWS
 	dgControlFP (controlWorld, _MCW_PC);
 #endif
 }

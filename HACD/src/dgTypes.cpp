@@ -336,7 +336,7 @@ static hacd::HaI32 QuickSortVertices (hacd::HaF64* const vertList, hacd::HaI32 s
 
 hacd::HaI32 dgVertexListToIndexList (hacd::HaF64* const vertList, hacd::HaI32 strideInBytes, hacd::HaI32 compareCount, hacd::HaI32 vertexCount, hacd::HaI32* const indexListOut, hacd::HaF64 tolerance)
 {
-#if (defined (WIN32) || defined (WIN64))
+#ifdef HACD_WINDOWS
 	hacd::HaU32 controlWorld = dgControlFP (0xffffffff, 0);
 	dgControlFP (_PC_53, _MCW_PC);
 #endif
@@ -388,7 +388,7 @@ hacd::HaI32 dgVertexListToIndexList (hacd::HaF64* const vertList, hacd::HaI32 st
 		m += stride2;
 	}
 
-#if (defined (WIN32) || defined (WIN64))
+#ifdef HACD_WINDOWS
 	dgControlFP (controlWorld, _MCW_PC);
 #endif
 
