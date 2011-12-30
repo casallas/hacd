@@ -31,8 +31,6 @@
 #include <Windows.h>
 #endif
 
-#define	DG_MAX_THREADS_HIVE_COUNT		16
-
 class dgTriplex
 {
 	public:
@@ -527,53 +525,6 @@ HACD_INLINE hacd::HaF32 dgCeil(hacd::HaF32 x)
 #define dgLog(x) hacd::HaF32 (log(x))
 #define dgPow(x,y) hacd::HaF32 (pow(x,y))
 #define dgFmod(x,y) hacd::HaF32 (fmod(x,y))
-
-#pragma warning(push)
-#pragma warning(disable:4100)
-
-inline hacd::HaI32 dgAtomicAdd (hacd::HaI32* const addend, hacd::HaI32 amount)
-{
-#if defined(HACD_WINDOWS) || defined(HACD_CYGWIN)
-	return InterlockedExchangeAdd((long*) addend, long (amount));
-#endif
-
-#ifdef HACD_LINUX
-	return __sync_fetch_and_add ((int32_t*)addend, amount );
-#endif
-
-#ifdef HACD_APPLE
-	hacd::HaI32 count = OSAtomicAdd32 (amount, (int32_t*)addend);
-	return count - *addend;
-#endif
-}
-
-inline hacd::HaI32 dgInterlockedExchange(hacd::HaI32* const ptr, hacd::HaI32 value)
-{
-#if defined(HACD_WINDOWS) || defined(HACD_CYGWIN)
-	return InterlockedExchange((long*) ptr, value);
-#endif
-
-#ifdef HACD_LINUX
-	return __sync_fetch_and_add ((int32_t*)ptr, value );
-#endif
-
-#ifdef HACD_APPLE
-	return OSAtomicAdd32 (value, (int32_t*)ptr);
-#endif
-}
-
-inline void dgThreadYield()
-{
-#if defined(HACD_WINDOWS) || defined(HACD_CYGWIN)
-	Sleep(0);
-#endif
-
-#if defined(HACD_LINUX) || defined(HACD_APPLE)
-	sched_yield();
-#endif
-}
-
-#pragma warning(pop)
 
 #endif
 

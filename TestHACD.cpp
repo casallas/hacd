@@ -73,6 +73,12 @@ int getIntArg(int arg,int argc,const char **argv)
 class MyCallback : public hacd::ICallback
 {
 public:
+	MyCallback(void)
+	{
+		mLastPercent = 0xFFFFFFFF;
+		mLastMessage = NULL;
+	}
+
 	virtual bool Cancelled()
 	{
 		// Don't have a cancel button in the test console app.
@@ -81,8 +87,24 @@ public:
 
 	virtual void ReportProgress(const char* message, hacd::HaF32 progress)
 	{
-//		std::cout << message;
+		hacd::HaU32 percent = (hacd::HaU32)(progress*100.0f);
+		if ( percent != mLastPercent || message != mLastMessage )
+		{
+			if ( message == mLastMessage )
+			{
+				printf("%c%c%c",8,8,8);
+				printf("%3d", percent );
+			}
+			else
+			{
+				printf("\r\n%s : %3d", message, percent);
+			}
+			mLastMessage = message;
+			mLastPercent = percent;
+		}
 	}
+	const char *	mLastMessage;
+	hacd::HaU32		mLastPercent;
 };
 
 void main(int argc,const char ** argv)
@@ -174,6 +196,7 @@ void main(int argc,const char ** argv)
 				hacd::HaU32 hullCount = HACD::gHACD->performHACD(desc);
 				if ( hullCount != 0 )
 				{
+					printf("\r\n");
 					printf("Produced %d output convex hulls. Saving output to 'ConvexDecomposition.obj' for review.\r\n", hullCount );
 					FILE *fph = fopen("ConvexDecomposition.obj", "wb");
 					if ( fph )

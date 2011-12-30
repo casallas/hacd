@@ -52,7 +52,8 @@ public:
 									MergeHullVector &outputHulls,
 									hacd::HaU32	mergeHullCount,
 									hacd::HaF32 smallClusterThreshold,
-									hacd::HaU32 maxHullVertices) = 0;
+									hacd::HaU32 maxHullVertices,
+									hacd::ICallback *callback) = 0;
 
 
 	virtual void release(void) = 0;

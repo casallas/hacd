@@ -248,19 +248,11 @@
 					>
 				</File>
 				<File
-					RelativePath="..\HACD\src\dgThreadHive.cpp"
-					>
-				</File>
-				<File
 					RelativePath="..\HACD\src\dgTree.cpp"
 					>
 				</File>
 				<File
 					RelativePath="..\HACD\src\dgTypes.cpp"
-					>
-				</File>
-				<File
-					RelativePath="..\HACD\src\dgWorkerThread.cpp"
 					>
 				</File>
 				<File
@@ -364,10 +356,6 @@
 					>
 				</File>
 				<File
-					RelativePath="..\HACD\include\dgThreadHive.h"
-					>
-				</File>
-				<File
 					RelativePath="..\HACD\include\dgTree.h"
 					>
 				</File>
@@ -377,10 +365,6 @@
 				</File>
 				<File
 					RelativePath="..\HACD\include\dgVector.h"
-					>
-				</File>
-				<File
-					RelativePath="..\HACD\include\dgWorkerThread.h"
 					>
 				</File>
 			</Filter>

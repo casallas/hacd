@@ -150,9 +150,6 @@ public:
 			}
 		}
 
-		//if (desc.mCallback)
-		//	desc.mCallback->ReportProgress("+ Merging Hulls\n", 99.0f);
-
 		if ( ret && ((ret > desc.mMaxMergeHullCount) || 
 			(desc.mSmallClusterThreshold != 0.0f)) )
 		{
@@ -172,7 +169,7 @@ public:
 					inputHulls.push_back(mh);
 				}
 
-				ret = mhi->mergeHulls(inputHulls,outputHulls,desc.mMaxMergeHullCount, desc.mSmallClusterThreshold + FLT_EPSILON, desc.mMaxHullVertices);
+				ret = mhi->mergeHulls(inputHulls,outputHulls,desc.mMaxMergeHullCount, desc.mSmallClusterThreshold + FLT_EPSILON, desc.mMaxHullVertices, desc.mCallback);
 
 				for (HaU32 i=0; i<ret; i++)
 				{

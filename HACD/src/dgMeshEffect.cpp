@@ -26,7 +26,6 @@
 #include "dgGraph.h"
 #include "dgAABBPolygonSoup.h"
 #include "dgPolygonSoupBuilder.h"
-#include "dgThreadHive.h"
 #include <string.h>
 
 #pragma warning(disable:4100)
@@ -3235,10 +3234,10 @@ class dgHACDClusterGraph
 		,m_convexProximation()
 		,m_priorityHeap (mesh.GetCount() + 2048)
 		,m_reportProgressCallback (reportProgressCallback)
-		,m_parallerConcavityCalculator()
+//		,m_parallerConcavityCalculator()
 	{
 		
-		m_parallerConcavityCalculator.SetThreadsCount(DG_CONCAVITY_MAX_THREADS);
+//		m_parallerConcavityCalculator.SetThreadsCount(DG_CONCAVITY_MAX_THREADS);
 
 		// precondition the mesh for better approximation
 		mesh.ConvertToPolygons();
@@ -3511,7 +3510,7 @@ class dgHACDClusterGraph
 		if (m_reportProgressCallback) 
 		{
 			hacd::HaF32 progress = hacd::HaF32(m_progress) * m_invFaceCount;
-			m_reportProgressCallback->ReportProgress("Progress",progress);
+			m_reportProgressCallback->ReportProgress("Performing HACD",progress);
 		}
 	}
 
@@ -3776,7 +3775,7 @@ class dgHACDClusterGraph
 			return concavity;
 		}
 
-
+#if 0
 		static void RayCastKernel (void* const context, hacd::HaI32 threadID)
 		{
 			dgConvexHullRayCastContext* const data = (dgConvexHullRayCastContext*) context;
@@ -3811,7 +3810,7 @@ class dgHACDClusterGraph
 				data->m_threadManager->ReleaseIndirectLock (&data->m_atomicLock);
 			}
 		}
-
+#endif
 
 		hacd::HaI32 m_atomicLock;
 		dgMeshEffect* m_mesh;
@@ -3823,31 +3822,6 @@ class dgHACDClusterGraph
 		hacd::HaF64 m_concavity[DG_CONCAVITY_MAX_THREADS];
 		dgHACDConveHull* hullArray[DG_CONCAVITY_MAX_THREADS];		
 	};
-
-
-	hacd::HaF64 CalculateConcavityMultiThread (dgHACDConveHull& hull, dgMeshEffect& mesh, dgHACDCluster& clusterA, dgHACDCluster& clusterB)
-	{
-		dgConvexHullRayCastContext data (hull, mesh, &m_parallerConcavityCalculator);
-
-		hacd::HaI32 threadsCount = m_parallerConcavityCalculator.GetThreadCount();	
-		data.SetCluster (clusterA);
-		for (hacd::HaI32 i = 0; i < threadsCount; i ++) {		
-			m_parallerConcavityCalculator.QueueJob(dgConvexHullRayCastContext::RayCastKernel, &data);
-		}
-		m_parallerConcavityCalculator.SynchronizationBarrier();
-		hacd::HaF64 concavity = data.GetConcavity();
-
-		data.SetCluster (clusterB);
-		for (hacd::HaI32 i = 0; i < threadsCount; i ++) {		
-			m_parallerConcavityCalculator.QueueJob(dgConvexHullRayCastContext::RayCastKernel, &data);
-		}
-		m_parallerConcavityCalculator.SynchronizationBarrier();
-		
-		concavity = GetMax(concavity, data.GetConcavity());
-		//hacd::HaF64 xxx = CalculateConcavitySingleThread (hull, mesh, clusterA, clusterB);
-		//HACD_ASSERT (fabs(concavity - xxx) < hacd::HaF64 (1.0e-5f));
-		return concavity;
-	}
 
 	dgList<dgPairProxy>::dgListNode* SubmitEdgeCost (dgMeshEffect& mesh, dgListNode* const clusterNodeA, dgListNode* const clusterNodeB, hacd::HaF64 perimeterHandicap)
 	{
@@ -3887,9 +3861,7 @@ class dgHACDClusterGraph
 
 	
 				hacd::HaF64 concavity = hacd::HaF64 (0.0f);
-				if ((convexHull.GetCount() > 128) && ((clusterA.GetCount() > 256) || (clusterB.GetCount() > 256))) { 
-					concavity = CalculateConcavityMultiThread (convexHull, mesh, clusterA, clusterB);
-				} else {
+				{
 					concavity = CalculateConcavitySingleThread (convexHull, mesh, clusterA, clusterB);
 				}
 
@@ -4136,7 +4108,6 @@ class dgHACDClusterGraph
 	dgList<dgHACDConvacityLookAheadTree*> m_convexProximation;
 	dgUpHeap<dgList<dgPairProxy>::dgListNode*, hacd::HaF64> m_priorityHeap;
 	hacd::ICallback* m_reportProgressCallback;
-	dgThreadHive m_parallerConcavityCalculator;
 };
 
 
@@ -4159,13 +4130,6 @@ dgMeshEffect* dgMeshEffect::CreateConvexApproximation(
 		maxVertexPerHull = 4;
 	}
 	ClampValue(backFaceDistanceFactor, hacd::HaF32 (0.01f), hacd::HaF32 (1.0f));
-
-	if (reportProgressCallback) 
-	{
-		reportProgressCallback->ReportProgress("Begin",0.0f);
-	}
-
-
 	// make a copy of the mesh
 	dgMeshEffect mesh(*this);
 	mesh.ClearAttributeArray();

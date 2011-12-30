@@ -197,7 +197,8 @@ public:
 		MergeHullVector &outputHulls,
 		hacd::HaU32 mergeHullCount,
 		hacd::HaF32 smallClusterThreshold,
-		hacd::HaU32 maxHullVertices)
+		hacd::HaU32 maxHullVertices,
+		hacd::ICallback *callback)
 	{
 		mGuid = 0;
 
@@ -214,12 +215,27 @@ public:
 			CHull *ch = HACD_NEW(CHull)(h.mVertexCount,h.mVertices,h.mTriangleCount,h.mIndices,mGuid++);
 			mChulls.push_back(ch);
 			mTotalVolume+=ch->mVolume;
+			if ( callback )
+			{
+				HaF32 fraction = (HaF32)i / (HaF32)inputHulls.size();
+				callback->ReportProgress("Gathering Hulls To Merge", fraction );
+			}
 		}
+
+		//
+		hacd::HaU32 mergeCount = count - mergeHullCount;
+		hacd::HaU32 mergeIndex = 0;
 
 		for(;;)
 		{
+			if ( callback )
+			{
+				hacd::HaF32 fraction = (hacd::HaF32)mergeIndex / (hacd::HaF32)mergeCount;
+				callback->ReportProgress("Merging", fraction );
+			}
 			bool combined = combineHulls(); // mege smallest hulls first, up to the max merge count.
 			if ( !combined ) break;
+			mergeIndex++;
 		} 
 
 		// return results..
@@ -232,6 +248,12 @@ public:
 			mh.mIndices = ch->mIndices;
 			mh.mVertices = ch->mVertices;
 			outputHulls.push_back(mh);
+			if ( callback )
+			{
+				HaF32 fraction = (HaF32)i / (HaF32)mChulls.size();
+				callback->ReportProgress("Gathering Merged Hulls Output", fraction );
+			}
+
 		}
 		delete mHasBeenTested;
 		return (HaU32)outputHulls.size();
