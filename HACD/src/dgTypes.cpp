@@ -24,6 +24,7 @@
 #include "dgStack.h"
 #include <string.h>
 
+#pragma warning(disable:4996)
 
 void GetMinMax (dgVector &minOut, dgVector &maxOut, const hacd::HaF32* const vertexArray, hacd::HaI32 vCount, hacd::HaI32 strideInBytes)
 {
@@ -335,7 +336,7 @@ static hacd::HaI32 QuickSortVertices (hacd::HaF64* const vertList, hacd::HaI32 s
 
 hacd::HaI32 dgVertexListToIndexList (hacd::HaF64* const vertList, hacd::HaI32 strideInBytes, hacd::HaI32 compareCount, hacd::HaI32 vertexCount, hacd::HaI32* const indexListOut, hacd::HaF64 tolerance)
 {
-#if (defined (_WIN_32_VER) || defined (_WIN_64_VER))
+#if (defined (WIN32) || defined (WIN64))
 	hacd::HaU32 controlWorld = dgControlFP (0xffffffff, 0);
 	dgControlFP (_PC_53, _MCW_PC);
 #endif
@@ -387,7 +388,7 @@ hacd::HaI32 dgVertexListToIndexList (hacd::HaF64* const vertList, hacd::HaI32 st
 		m += stride2;
 	}
 
-#if (defined (_WIN_32_VER) || defined (_WIN_64_VER))
+#if (defined (WIN32) || defined (WIN64))
 	dgControlFP (controlWorld, _MCW_PC);
 #endif
 

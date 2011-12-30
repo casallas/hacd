@@ -33,6 +33,7 @@ class dgMeshEffect;
 class dgMeshEffectSolidTree;
 class dgMeshTreeCSGEdgePool;
 class dgConvexHull3d;
+class dgThreadHive;
 
 
 #define DG_MESH_EFFECT_INITIAL_VERTEX_SIZE	8
@@ -204,7 +205,14 @@ class dgMeshEffect: public dgPolyhedra, public dgRefCounter, public UANS::UserAl
 	
 	dgConvexHull3d * dgMeshEffect::CreateConvexHull(hacd::HaF64 tolerance,hacd::HaI32 maxVertexCount) const;
 
-	dgMeshEffect* CreateConvexApproximation (hacd::HaF32 maxConcavity, hacd::HaI32 maxCount = 32, hacd::ICallback* callback = NULL) const;
+	dgMeshEffect* dgMeshEffect::CreateConvexApproximation(
+		hacd::HaF32 maxConcavity, 
+		hacd::HaF32 backFaceDistanceFactor, 
+		hacd::HaI32 maxHullsCount, 
+		hacd::HaI32 maxVertexPerHull,
+		hacd::ICallback *reportProgressCallback) const;
+
+	dgMeshEffect* dgMeshEffect::CreateSimplification(hacd::HaI32 maxVertexCount, hacd::ICallback *reportProgressCallback) const;
 
 	dgVertexAtribute& GetAttribute (hacd::HaI32 index) const;
 	void TransformMesh (const dgMatrix& matrix);
@@ -236,13 +244,13 @@ class dgMeshEffect: public dgPolyhedra, public dgRefCounter, public UANS::UserAl
 	bool Sanity () const;
 
 	protected:
-
+	void ClearAttributeArray ();
 	void Init (bool preAllocaBuffers);
 	dgBigVector GetOrigin ()const;
 	hacd::HaI32 CalculateMaxAttributes () const;
 	hacd::HaF64 QuantizeCordinade(hacd::HaF64 val) const;
-	void EnumerateAttributeArray (dgVertexAtribute* const attib);
-	void ApplyAttributeArray (dgVertexAtribute* const attib);
+	hacd::HaI32 EnumerateAttributeArray (dgVertexAtribute* const attib);
+	void ApplyAttributeArray (dgVertexAtribute* const attib,hacd::HaI32 maxCount);
 	void AddVertex(const dgBigVector& vertex);
 	void AddAtribute (const dgVertexAtribute& attib);
 	void AddPoint(const hacd::HaF64* vertexList, hacd::HaI32 material);

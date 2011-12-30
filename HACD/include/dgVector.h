@@ -23,6 +23,7 @@
 #define __dgVector__
 
 #include "dgTypes.h"
+#include "dgSimd_Instrutions.h"
 
 #define dgCheckVector(x) (dgCheckFloat(x[0]) && dgCheckFloat(x[1]) && dgCheckFloat(x[2]) && dgCheckFloat(x[3]))
 //#define dgCheckVector(x) true
@@ -79,19 +80,29 @@ class dgTemplateVector
 
 class dgBigVector;
 
+DG_MSC_VECTOR_ALIGMENT
 class dgVector: public dgTemplateVector<hacd::HaF32>
 {
 	public:
 	dgVector();
+//	dgVector(const simd_type& val);
+	dgVector(const simd_128& val);
 
 	dgVector (const dgTemplateVector<hacd::HaF32>& v);
 	dgVector (const hacd::HaF32 *ptr);
 	dgVector (hacd::HaF32 x, hacd::HaF32 y, hacd::HaF32 z, hacd::HaF32 w); 
          dgVector (const dgBigVector& copy); 
 
+//	dgVector operator= (const simd_type& val);
+	dgVector operator= (const simd_128& val);
 
-};
+	hacd::HaF32 DotProductSimd (const dgVector& A) const;
+	dgVector CrossProductSimd (const dgVector &A) const;
+	dgVector CompProductSimd (const dgVector &A) const;
 
+}DG_GCC_VECTOR_ALIGMENT;
+
+DG_MSC_VECTOR_ALIGMENT
 class dgBigVector: public dgTemplateVector<hacd::HaF64>
 {
 	public:
@@ -103,7 +114,7 @@ class dgBigVector: public dgTemplateVector<hacd::HaF64>
 	dgBigVector (const hacd::HaF64 *ptr);
 #endif
 	dgBigVector (hacd::HaF64 x, hacd::HaF64 y, hacd::HaF64 z, hacd::HaF64 w); 
-};
+}DG_GCC_VECTOR_ALIGMENT;
 
 
 
@@ -278,68 +289,101 @@ dgTemplateVector<T> dgTemplateVector<T>::CompProduct4 (const dgTemplateVector<T>
 
 
 
-HACD_INLINE dgVector::dgVector()
+DG_INLINE dgVector::dgVector()
 	:dgTemplateVector<hacd::HaF32>()
 {
 }
 
-HACD_INLINE dgVector::dgVector (const dgTemplateVector<hacd::HaF32>& v)
+DG_INLINE dgVector::dgVector (const dgTemplateVector<hacd::HaF32>& v)
 	:dgTemplateVector<hacd::HaF32>(v)
 {
 	HACD_ASSERT (dgCheckVector ((*this)));
 }
 
-HACD_INLINE dgVector::dgVector (const hacd::HaF32 *ptr)
+DG_INLINE dgVector::dgVector (const hacd::HaF32 *ptr)
 	:dgTemplateVector<hacd::HaF32>(ptr)
 {
 	HACD_ASSERT (dgCheckVector ((*this)));
 }
 
-HACD_INLINE dgVector::dgVector (const dgBigVector& copy)
+DG_INLINE dgVector::dgVector (const dgBigVector& copy)
 	:dgTemplateVector<hacd::HaF32>(hacd::HaF32 (copy.m_x), hacd::HaF32 (copy.m_y), hacd::HaF32 (copy.m_z), hacd::HaF32 (copy.m_w))
 {
 	HACD_ASSERT (dgCheckVector ((*this)));
 }
 
+DG_INLINE dgVector::dgVector(const simd_128& val)
+{
+	HACD_ASSERT ((hacd::HaU64(this) & 0x0f) == 0);
+	(simd_128&) *this = val;
+	HACD_ASSERT (dgCheckVector ((*this)));
+}
 
-HACD_INLINE dgVector::dgVector (hacd::HaF32 x, hacd::HaF32 y, hacd::HaF32 z, hacd::HaF32 w) 
+
+DG_INLINE dgVector dgVector::operator= (const simd_128& val)
+{
+	(simd_128&)*this = val;
+	return *this;
+}
+
+
+DG_INLINE dgVector::dgVector (hacd::HaF32 x, hacd::HaF32 y, hacd::HaF32 z, hacd::HaF32 w) 
 	:dgTemplateVector<hacd::HaF32>(x, y, z, w)
 {
 	HACD_ASSERT (dgCheckVector ((*this)));
 }
 
-HACD_INLINE dgBigVector::dgBigVector()
+DG_INLINE hacd::HaF32 dgVector::DotProductSimd (const dgVector& A) const
+{
+	hacd::HaF32 dot;
+	simd_128 temp (((simd_128&)*this).DotProduct((simd_128&)A));
+	temp.StoreScalar (&dot);
+	return dot;
+}
+
+DG_INLINE dgVector dgVector::CrossProductSimd (const dgVector &e10) const
+{
+	return ((simd_128&)*this).CrossProduct((simd_128&)e10);
+}
+
+
+DG_INLINE dgVector dgVector::CompProductSimd (const dgVector &A) const
+{
+	return ((simd_128&)*this) * (simd_128&)A;
+}
+
+DG_INLINE dgBigVector::dgBigVector()
 	:dgTemplateVector<hacd::HaF64>()
 {
 }
 
-HACD_INLINE dgBigVector::dgBigVector (const dgVector& v)
+DG_INLINE dgBigVector::dgBigVector (const dgVector& v)
 	:dgTemplateVector<hacd::HaF64>(v.m_x, v.m_y, v.m_z, v.m_w)
 {
 	HACD_ASSERT (dgCheckVector ((*this)));
 }
 
-HACD_INLINE dgBigVector::dgBigVector (const dgTemplateVector<hacd::HaF64>& v)
+DG_INLINE dgBigVector::dgBigVector (const dgTemplateVector<hacd::HaF64>& v)
 	:dgTemplateVector<hacd::HaF64>(v)
 {
 	HACD_ASSERT (dgCheckVector ((*this)));
 }
 
-HACD_INLINE dgBigVector::dgBigVector (const hacd::HaF32 *ptr)
+DG_INLINE dgBigVector::dgBigVector (const hacd::HaF32 *ptr)
 	:dgTemplateVector<hacd::HaF64>(ptr[0], ptr[1], ptr[2], hacd::HaF64 (0.0f))
 {
 	HACD_ASSERT (dgCheckVector ((*this)));
 }
 
 #ifndef __USE_DOUBLE_PRECISION__
-HACD_INLINE dgBigVector::dgBigVector (const hacd::HaF64 *ptr)
+DG_INLINE dgBigVector::dgBigVector (const hacd::HaF64 *ptr)
 	:dgTemplateVector<hacd::HaF64>(ptr)
 {
 	HACD_ASSERT (dgCheckVector ((*this)));
 }
 #endif
 
-HACD_INLINE dgBigVector::dgBigVector (hacd::HaF64 x, hacd::HaF64 y, hacd::HaF64 z, hacd::HaF64 w) 
+DG_INLINE dgBigVector::dgBigVector (hacd::HaF64 x, hacd::HaF64 y, hacd::HaF64 z, hacd::HaF64 w) 
 	:dgTemplateVector<hacd::HaF64>(x, y, z, w)
 {
 	HACD_ASSERT (dgCheckVector ((*this)));

@@ -23,8 +23,15 @@
 #define AFX_DGTYPES__42YH_HY78GT_YHJ63Y__INCLUDED_
 
 #include "PlatformConfigHACD.h"
+
 #include <math.h>
 #include <float.h>
+
+#if defined(WIN32) || defined(WIN64)
+#include <Windows.h>
+#endif
+
+#define	DG_MAX_THREADS_HIVE_COUNT		16
 
 class dgTriplex
 {
@@ -34,6 +41,46 @@ class dgTriplex
 	hacd::HaF32 m_z;
 };
 
+#if (defined (WIN32) || defined (WIN64))
+#if (_MSC_VER >= 1400)
+#include <intrin.h>
+#else 
+#if (_MSC_VER >= 1300)
+#include <xmmintrin.h>
+#endif
+#endif
+#endif
+
+
+
+#ifdef __ppc__
+#include <vecLib/veclib.h>
+#endif
+
+#if (defined (__i386__) || defined (__x86_64__))
+#include <xmmintrin.h>
+#endif
+
+
+typedef hacd::HaU32 (*OnGetPerformanceCountCallback) ();
+
+
+#if (defined (WIN32) || defined (WIN64))
+	#define	DG_MSC_VECTOR_ALIGMENT	__declspec(align(16))
+	#define	DG_GCC_VECTOR_ALIGMENT	
+#else
+	#define	DG_MSC_VECTOR_ALIGMENT
+	#define	DG_GCC_VECTOR_ALIGMENT	__attribute__ ((aligned (16)))
+#endif
+
+#if (defined (WIN32) || defined (WIN64))
+#define DG_INLINE __forceinline 
+#else 
+#define DG_INLINE inline 
+#endif
+
+
+#define DG_BUILD_SIMD_CODE
 #define DG_MEMORY_GRANULARITY 16
 
 #define dgPI			 	hacd::HaF32 (3.14159f)
@@ -488,6 +535,52 @@ HACD_INLINE hacd::HaF32 dgCeil(hacd::HaF32 x)
 #define dgPow(x,y) hacd::HaF32 (pow(x,y))
 #define dgFmod(x,y) hacd::HaF32 (fmod(x,y))
 
+#pragma warning(push)
+#pragma warning(disable:4100)
+
+inline hacd::HaI32 dgAtomicAdd (hacd::HaI32* const addend, hacd::HaI32 amount)
+{
+#if (defined (WIN32) || defined (WIN64) || defined (_MINGW_32_VER) || defined (_MINGW_64_VER))
+	return InterlockedExchangeAdd((long*) addend, long (amount));
+#endif
+
+#if (defined (_LINUX_VER))
+	return __sync_fetch_and_add ((int32_t*)addend, amount );
+#endif
+
+#if (defined (_MAC_VER))
+	hacd::HaI32 count = OSAtomicAdd32 (amount, (int32_t*)addend);
+	return count - *addend;
+#endif
+}
+
+inline hacd::HaI32 dgInterlockedExchange(hacd::HaI32* const ptr, hacd::HaI32 value)
+{
+#if (defined (WIN32) || defined (WIN64) || defined (_MINGW_32_VER) || defined (_MINGW_64_VER))
+	return InterlockedExchange((long*) ptr, value);
+#endif
+
+#if (defined (_LINUX_VER))
+	return __sync_fetch_and_add ((int32_t*)ptr, value );
+#endif
+
+#if (defined (_MAC_VER))
+	return OSAtomicAdd32 (value, (int32_t*)ptr);
+#endif
+}
+
+inline void dgThreadYield()
+{
+#if (defined (WIN32) || defined (WIN64) || defined (_MINGW_32_VER) || defined (_MINGW_64_VER))
+	Sleep(0);
+#endif
+
+#if (defined (_LINUX_VER) || defined (_MAC_VER))
+	sched_yield();
+#endif
+}
+
+#pragma warning(pop)
 
 #endif
 

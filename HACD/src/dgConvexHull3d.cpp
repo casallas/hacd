@@ -19,13 +19,16 @@
 * 3. This notice may not be removed or altered from any source distribution.
 */
 
-#include "dgTypes.h"
 #include "dgStack.h"
+#include "dgTree.h"
 #include "dgGoogol.h"
 #include "dgConvexHull3d.h"
 #include "dgSmallDeterminant.h"
 
 #define DG_VERTEX_CLUMP_SIZE_3D		8 
+
+#pragma warning(disable:4996 4324)
+
 class dgAABBPointTree3d
 {
 	public:
@@ -111,14 +114,54 @@ dgBigPlane dgConvexHull3DFace::GetPlaneEquation (const dgBigVector* const pointA
 }
 
 
-dgConvexHull3d::dgConvexHull3d (void)
-	:dgList<dgConvexHull3DFace>(), m_count (0), m_diag(), m_points(1024)
+dgConvexHull3d::dgConvexHull3d ()
+	:dgList<dgConvexHull3DFace>()
+	,m_count (0)
+	,m_diag()
+	,m_aabbP0(dgBigVector (hacd::HaF64 (0.0), hacd::HaF64 (0.0), hacd::HaF64 (0.0), hacd::HaF64 (0.0)))
+	,m_aabbP1(dgBigVector (hacd::HaF64 (0.0), hacd::HaF64 (0.0), hacd::HaF64 (0.0), hacd::HaF64 (0.0)))
+	,m_points(1024)
 {
 }
 
+dgConvexHull3d::dgConvexHull3d(const dgConvexHull3d& source)
+	:dgList<dgConvexHull3DFace>()
+	,m_count (source.m_count)
+	,m_diag(source.m_diag)
+	,m_aabbP0 (source.m_aabbP0)
+	,m_aabbP1 (source.m_aabbP1)
+	,m_points(source.m_count) 
+{
+	m_points[m_count-1].m_w = hacd::HaF64 (0.0f);
+	for (int i = 0; i < m_count; i ++) {
+		m_points[i] = source.m_points[i];
+	}
+	dgTree<dgListNode*, dgListNode*> map;
+	for(dgListNode* sourceNode = source.GetFirst(); sourceNode; sourceNode = sourceNode->GetNext() ) {
+		dgListNode* const node = Append();
+		map.Insert(node, sourceNode);
+	}
+
+	for(dgListNode* sourceNode = source.GetFirst(); sourceNode; sourceNode = sourceNode->GetNext() ) {
+		dgListNode* const node = map.Find(sourceNode)->GetInfo();
+
+		dgConvexHull3DFace& face = node->GetInfo();
+		dgConvexHull3DFace& srcFace = sourceNode->GetInfo();
+
+		face.m_mark = 0;
+		for (hacd::HaI32 i = 0; i < 3; i ++) {
+			face.m_index[i] = srcFace.m_index[i];
+			face.m_twin[i] = map.Find (srcFace.m_twin[i])->GetInfo();
+		}
+	}
+}
 
 dgConvexHull3d::dgConvexHull3d(const hacd::HaF64* const vertexCloud, hacd::HaI32 strideInBytes, hacd::HaI32 count, hacd::HaF64 distTol, hacd::HaI32 maxVertexCount)
-	:dgList<dgConvexHull3DFace>(),  m_count (0), m_diag(), m_points(count) 
+	:m_count (0)
+	,m_diag()
+	,m_aabbP0 (dgBigVector (hacd::HaF64 (0.0), hacd::HaF64 (0.0), hacd::HaF64 (0.0), hacd::HaF64 (0.0)))
+	,m_aabbP1 (dgBigVector (hacd::HaF64 (0.0), hacd::HaF64 (0.0), hacd::HaF64 (0.0), hacd::HaF64 (0.0)))
+	,m_points(count) 
 {
 	BuildHull (vertexCloud, strideInBytes, count, distTol, maxVertexCount);
 }
@@ -129,7 +172,7 @@ dgConvexHull3d::~dgConvexHull3d(void)
 
 void dgConvexHull3d::BuildHull (const hacd::HaF64* const vertexCloud, hacd::HaI32 strideInBytes, hacd::HaI32 count, hacd::HaF64 distTol, hacd::HaI32 maxVertexCount)
 {
-#if (defined (_WIN_32_VER) || defined (_WIN_64_VER))
+#if (defined (WIN32) || defined (WIN64))
 	hacd::HaU32 controlWorld = dgControlFP (0xffffffff, 0);
 	dgControlFP (_PC_53, _MCW_PC);
 #endif
@@ -148,7 +191,7 @@ void dgConvexHull3d::BuildHull (const hacd::HaF64* const vertexCloud, hacd::HaI3
 		CalculateConvexHull (&treePool[0], &points[0], count, distTol, maxVertexCount);
 	}
 
-#if (defined (_WIN_32_VER) || defined (_WIN_64_VER))
+#if (defined (WIN32) || defined (WIN64))
 	dgControlFP (controlWorld, _MCW_PC);
 #endif
 }
@@ -326,6 +369,9 @@ hacd::HaI32 dgConvexHull3d::InitVertexArray(dgHullVertex* const points, const ha
 	}
 
 	dgAABBPointTree3d* tree = BuildTree (NULL, points, count, 0, (hacd::HaI8**) &memoryPool, maxMemSize);
+
+	m_aabbP0 = tree->m_box[0];
+	m_aabbP1 = tree->m_box[1];
 
 	dgBigVector boxSize (tree->m_box[1] - tree->m_box[0]);	
 	m_diag = hacd::HaF32 (sqrt (boxSize % boxSize));
@@ -726,8 +772,27 @@ void dgConvexHull3d::CalculateConvexHull (dgAABBPointTree3d* vertexTree, dgHullV
 	hacd::HaI32 currentIndex = 4;
 
 	while (boundaryFaces.GetCount() && count && (maxVertexCount > 0)) {
+		// my definition of the optimal convex hull of a given vertex count, 
+		// is the convex hull formed by a subset of vertex from the input array  
+		// that minimized the volume difference between the perfect hull form those vertex, and the hull of the sub set of vertex.
+		// Only using a priority heap we can be sure that it will generate the best hull selecting the best points from the vertex array.
+		// Since all our tools do not have a limit on the point count of a hull I can use either a list of a queue.
+		// a stack maximize construction speed, a Queue tend to maximize the volume of the generated Hull. for now we use a queue.
+		// For perfect hulls it does not make a difference if we use a stack, queue, or a priority heap, 
+		// this only apply for when build hull of a limited vertex count.
+		//
+		// Also when building Hulls of a limited vertex count, this function runs in constant time.
+		// yes that is correct, it does not makes a difference if you build a N point hull from 100 vertex 
+		// or from 100000 vertex input array.
+		
+		#if 0
+			// using stack (faster)
+			dgListNode* const faceNode = boundaryFaces.GetFirst()->GetInfo();
+		#else 
+			// using a queue (some what slower by better hull for reduce vertex count)
+			dgListNode* const faceNode = boundaryFaces.GetLast()->GetInfo();
+		#endif
 
-		dgListNode* const faceNode = boundaryFaces.GetFirst()->GetInfo();
 		dgConvexHull3DFace* const face = &faceNode->GetInfo();
 		dgBigPlane planeEquation (face->GetPlaneEquation (&m_points[0]));
 
@@ -848,16 +913,37 @@ void dgConvexHull3d::CalculateConvexHull (dgAABBPointTree3d* vertexTree, dgHullV
 }
 
 
+void dgConvexHull3d::CalculateVolumeAndSurfaceArea (hacd::HaF64& volume, hacd::HaF64& surfaceArea) const
+{
+	hacd::HaF64 areaAcc = hacd::HaF32 (0.0f);
+	hacd::HaF64  volumeAcc = hacd::HaF32 (0.0f);
+	for (dgListNode* node = GetFirst(); node; node = node->GetNext()) {
+		const dgConvexHull3DFace* const face = &node->GetInfo();
+		hacd::HaI32 i0 = face->m_index[0];
+		hacd::HaI32 i1 = face->m_index[1];
+		hacd::HaI32 i2 = face->m_index[2];
+		const dgBigVector& p0 = m_points[i0];
+		const dgBigVector& p1 = m_points[i1];
+		const dgBigVector& p2 = m_points[i2];
+		dgBigVector normal ((p1 - p0) * (p2 - p0));
+		hacd::HaF64 area = sqrt (normal % normal);
+		areaAcc += area;
+		volumeAcc += (p0 * p1) % p2;
+	}
+	HACD_ASSERT (volumeAcc >= hacd::HaF64 (0.0f));
+	volume = volumeAcc * hacd::HaF64 (1.0f/6.0f);
+	surfaceArea = areaAcc * hacd::HaF64 (0.5f);
+}
 
+// this code has linear time complexity on the number of faces
 hacd::HaF64 dgConvexHull3d::RayCast (const dgBigVector& localP0, const dgBigVector& localP1) const
 {
 	hacd::HaF64 interset = hacd::HaF32 (1.2f);
-
-	hacd::HaF64 tE = hacd::HaF64 (0.0f);           //for the maximum entering segment parameter;
-	hacd::HaF64 tL = hacd::HaF64 (1.0f);           //for the minimum leaving segment parameter;
+	hacd::HaF64 tE = hacd::HaF64 (0.0f);    // for the maximum entering segment parameter;
+	hacd::HaF64 tL = hacd::HaF64 (1.0f);    // for the minimum leaving segment parameter;
 	dgBigVector dS (localP1 - localP0); // is the segment direction vector;
-
 	hacd::HaI32 hasHit = 0;
+
 	for (dgListNode* node = GetFirst(); node; node = node->GetNext()) {
 		const dgConvexHull3DFace* const face = &node->GetInfo();
 
@@ -884,7 +970,6 @@ hacd::HaF64 dgConvexHull3d::RayCast (const dgBigVector& localP0, const dgBigVect
 			if (t > tE) {
 				tE = t;
 				hasHit = 1;
-//				hitNormal = normal;
 			}
 			if (tE > tL) {
 				return hacd::HaF64 (1.2f);

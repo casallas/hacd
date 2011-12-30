@@ -803,7 +803,7 @@ hacd::HaI32 dgSphere::VisibilityTest (const dgCamera* camera, const dgMatrix &wo
 void dgSphere::Render (
 	const dgCamera* camera, 
 	const dgMatrix &worldMatrix, 
-	dgUnsigned32 rgb) const
+	hacd::HaU32 rgb) const
 {
 	hacd::HaI32 i;
 	struct ColorVertex
@@ -814,7 +814,7 @@ void dgSphere::Render (
 		dgColor m_color;
 	};
 
-	dgUnsigned32 index [][2] = {
+	hacd::HaU32 index [][2] = {
 		{0, 4}, {1, 5}, {2, 6}, {3, 7},
 		{0, 1}, {4, 5}, {7, 6}, {3, 2},
 		{1, 2}, {5, 6}, {4, 7}, {0, 3},
@@ -879,7 +879,7 @@ void dgSphere::Render (
 
   	dgVertexRecord vertexRecord (desc.LockVertex());
 	ptr = (ColorVertex*) vertexRecord.vertex.ptr;
-	for (i = 0; i < (sizeof (index) / (2 * sizeof (dgUnsigned32))); i ++) {
+	for (i = 0; i < (sizeof (index) / (2 * sizeof (hacd::HaU32))); i ++) {
 		 ptr[0] = box[index[i][0]]; 
 		 ptr[1] = box[index[i][1]]; 
 		 ptr += 2;

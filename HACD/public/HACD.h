@@ -56,6 +56,7 @@ public:
 		hacd::HaU32			mMaxHullVertices;
 		hacd::HaF32			mConcavity;
 		hacd::HaF32			mSmallClusterThreshold;
+		hacd::HaF32			mBackFaceDistanceFactor;
 		hacd::ICallback*	mCallback;
 		void init(void)
 		{
@@ -68,6 +69,7 @@ public:
 			mMaxHullVertices = 64;
 			mConcavity = 0.2f;
 			mSmallClusterThreshold = 0.0f;
+			mBackFaceDistanceFactor = 0.2f;
 			mCallback = NULL;
 		}
 	};

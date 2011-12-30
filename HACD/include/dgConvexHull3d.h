@@ -22,6 +22,7 @@
 #ifndef __DG_CONVEXHULL_3D__
 #define __DG_CONVEXHULL_3D__
 
+#include "dgTypes.h"
 #include "dgList.h"
 #include "dgArray.h"
 #include "dgPlane.h"
@@ -37,6 +38,10 @@ class dgConvexHull3DFace
 	dgConvexHull3DFace();
 	hacd::HaI32 m_index[3]; 
 	
+	void SetMark(hacd::HaI32 mark) {m_mark = mark;}
+	hacd::HaI32 GetMark() const {return m_mark;}
+	dgList<dgConvexHull3DFace>::dgListNode* GetTwin(hacd::HaI32 index) const { return m_twin[index];}
+
 	private:
 	hacd::HaF64 Evalue (const dgBigVector* const pointArray, const dgBigVector& point) const;
 	dgBigPlane GetPlaneEquation (const dgBigVector* const pointArray) const;
@@ -51,6 +56,7 @@ class dgHullVertex;
 class dgConvexHull3d: public dgList<dgConvexHull3DFace>, public UANS::UserAllocated
 {
 	public:
+	dgConvexHull3d(const dgConvexHull3d& source);
 	dgConvexHull3d(const hacd::HaF64* const vertexCloud, hacd::HaI32 strideInBytes, hacd::HaI32 count, hacd::HaF64 distTol, hacd::HaI32 maxVertexCount = 0x7fffffff);
 	virtual ~dgConvexHull3d();
 
@@ -59,16 +65,16 @@ class dgConvexHull3d: public dgList<dgConvexHull3DFace>, public UANS::UserAlloca
 	const dgBigVector& GetVertex(hacd::HaI32 i) const;
 
 	hacd::HaF64 GetDiagonal() const;
+	void GetAABB (dgBigVector& boxP0, dgBigVector& boxP1) const;
 	hacd::HaF64 RayCast (const dgBigVector& localP0, const dgBigVector& localP1) const;
+	void CalculateVolumeAndSurfaceArea (hacd::HaF64& volume, hacd::HaF64& surcafeArea) const;
 
 	protected:
-	
 	dgConvexHull3d(void);
 	void BuildHull (const hacd::HaF64* const vertexCloud, hacd::HaI32 strideInBytes, hacd::HaI32 count, hacd::HaF64 distTol, hacd::HaI32 maxVertexCount);
 
 	virtual dgListNode* AddFace (hacd::HaI32 i0, hacd::HaI32 i1, hacd::HaI32 i2);
 	virtual void DeleteFace (dgListNode* const node) ;
-//	virtual hacd::HaI32 InitVertexArray(dgBigVector* const convexPoints, dgBigVector* const points, const hacd::HaF64* const vertexCloud, hacd::HaI32 strideInBytes, hacd::HaI32 count, void* const memoryPool, hacd::HaI32 maxMemSize);
 	virtual hacd::HaI32 InitVertexArray(dgHullVertex* const points, const hacd::HaF64* const vertexCloud, hacd::HaI32 strideInBytes, hacd::HaI32 count, void* const memoryPool, hacd::HaI32 maxMemSize);
 
 	void CalculateConvexHull (dgAABBPointTree3d* vertexTree, dgHullVertex* const points, hacd::HaI32 count, hacd::HaF64 distTol, hacd::HaI32 maxVertexCount);
@@ -83,6 +89,8 @@ class dgConvexHull3d: public dgList<dgConvexHull3DFace>, public UANS::UserAlloca
 
 	hacd::HaI32 m_count;
 	hacd::HaF64 m_diag;
+	dgBigVector m_aabbP0;
+	dgBigVector m_aabbP1;
 	dgArray<dgBigVector> m_points;
 };
 
@@ -105,6 +113,13 @@ inline const dgBigVector& dgConvexHull3d::GetVertex(hacd::HaI32 index) const
 inline hacd::HaF64 dgConvexHull3d::GetDiagonal() const
 {
 	return m_diag;
+}
+
+
+inline void dgConvexHull3d::GetAABB (dgBigVector& boxP0, dgBigVector& boxP1) const
+{
+	boxP0 = m_aabbP0;
+	boxP1 = m_aabbP1;
 }
 
 #endif

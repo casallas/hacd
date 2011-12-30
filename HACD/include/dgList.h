@@ -28,7 +28,7 @@ template<class T>
 class dgList 
 {
 	public:
-	class dgListNode : public UANS::UserAllocated
+		class dgListNode : public UANS::UserAllocated
 	{
 		dgListNode (dgListNode* const prev, dgListNode* const next) 
 			:m_info () 
@@ -205,7 +205,7 @@ class dgList
 	public:
 
 //	dgList ();
-	dgList ();
+	dgList (void);
 	virtual ~dgList ();
 
 	operator hacd::HaI32() const;
@@ -218,11 +218,12 @@ class dgList
 	dgListNode *Addtop ();
 	dgListNode *Addtop (dgListNode* const node);
 	dgListNode *Addtop (const T &element);
-
+	
 	void RotateToEnd (dgListNode* const node);
 	void RotateToBegin (dgListNode* const node);
 	void InsertAfter (dgListNode* const root, dgListNode* const node);
 	void InsertBefore (dgListNode* const root, dgListNode* const node);
+
 
 	dgListNode *Find (const T &element) const;
 	dgListNode *GetNodeFromInfo (T &m_info) const;
@@ -230,6 +231,7 @@ class dgList
 	void Remove (const T &element);
 	void RemoveAll ();
 
+	void Merge (dgList<T>& list);
 	void Unlink (dgListNode* const node);
 	bool SanityCheck () const;
 
@@ -246,18 +248,8 @@ class dgList
 	friend class dgListNode;
 };
 
-/*
 template<class T>
-dgList<T>::dgList ()
-{
-	m_count = 0;
-	m_first = NULL;
-	m_last = NULL;
-}
-*/
-
-template<class T>
-dgList<T>::dgList ()
+dgList<T>::dgList (void)
 {
 	m_count = 0;
 	m_first = NULL;
@@ -270,6 +262,7 @@ dgList<T>::~dgList ()
 {
 	RemoveAll ();
 }
+
 
 template<class T>
 hacd::HaI32 dgList<T>::GetCount() const
@@ -562,6 +555,29 @@ void dgList<T>::Unlink (dgListNode* const node)
 //	node->Remove();
 	node->Unlink();
 
+#ifdef __ENABLE_SANITY_CHECK 
+	HACD_ASSERT (SanityCheck ());
+#endif
+}
+
+template<class T> 
+void dgList<T>::Merge (dgList<T>& list)
+{
+	m_count += list.m_count;
+	if (list.m_first) {
+		list.m_first->m_prev = m_last; 
+	}
+	if (m_last) {
+		m_last->m_next = list.m_first;
+	}
+	m_last = list.m_last;
+	if (!m_first) {
+		m_first = list.m_first;
+	}
+
+	list.m_count = 0;
+	list.m_last = NULL;
+	list.m_first = NULL;
 #ifdef __ENABLE_SANITY_CHECK 
 	HACD_ASSERT (SanityCheck ());
 #endif

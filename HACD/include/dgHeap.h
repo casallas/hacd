@@ -65,6 +65,7 @@ class dgHeapBase
 	hacd::HaI32 m_curCount;
 	hacd::HaI32 m_maxCount;
 	RECORD *m_pool;
+	bool		mOwnMemory; // whether or not we own the memory pool and are responsible for freeing the memory on exit.
 };
 
 template <class OBJECT, class KEY>
@@ -106,6 +107,7 @@ class dgUpHeap: public dgHeapBase<OBJECT, KEY>
 template <class OBJECT, class KEY>
 dgHeapBase<OBJECT,KEY>::dgHeapBase (hacd::HaI32 maxElements)
 {
+	mOwnMemory = true;
 	m_pool = (RECORD *)HACD_ALLOC(maxElements * sizeof (RECORD));
 	m_maxCount = maxElements;
 	Flush();
@@ -114,6 +116,7 @@ dgHeapBase<OBJECT,KEY>::dgHeapBase (hacd::HaI32 maxElements)
 template <class OBJECT, class KEY>
 dgHeapBase<OBJECT,KEY>::dgHeapBase (const void * const buffer, hacd::HaI32 sizeInBytes)
 {
+	mOwnMemory = false;
 	m_pool = (RECORD *) buffer;
 	m_maxCount = hacd::HaI32 (sizeInBytes / sizeof (RECORD));
 	Flush();
@@ -122,7 +125,10 @@ dgHeapBase<OBJECT,KEY>::dgHeapBase (const void * const buffer, hacd::HaI32 sizeI
 template <class OBJECT, class KEY>
 dgHeapBase<OBJECT,KEY>::~dgHeapBase ()
 {   
-	HACD_FREE(m_pool);
+	if ( mOwnMemory )
+	{
+		HACD_FREE(m_pool);
+	}
 }
 
 

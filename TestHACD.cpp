@@ -81,7 +81,7 @@ public:
 
 	virtual void ReportProgress(const char* message, hacd::HaF32 progress)
 	{
-		std::cout << message;
+//		std::cout << message;
 	}
 };
 
@@ -97,6 +97,7 @@ void main(int argc,const char ** argv)
 		printf("-merge <count> : Maximum number of hulls after merging the HACD result.\r\n");
 		printf("-mergethreshold <volume> : Threshold below which hulls are merged if they are smaller than the given volume.\r\n");
 		printf("-c <concavity> : Between 0 and 1 are good ranges to try; default is 0.2.  The smaller the number, the more convex hulls are produced.\r\n");
+		printf("-b <backFaceDistanceFactor : The back face distance factor, default is 0.2.\r\n");
 		printf("\r\n");
 		printf("Example: TestHACD hornbug.obj -m 40 -v 64\r\n");
 		printf("\r\n");
@@ -112,6 +113,11 @@ void main(int argc,const char ** argv)
 			if ( strcmp(option,"-v") == 0 )
 			{
 				desc.mMaxHullVertices = getIntArg(scan+1,argc,argv);
+				scan+=2;
+			}
+			else if ( strcmp(option,"-b") == 0 )
+			{
+				desc.mBackFaceDistanceFactor = getFloatArg(scan+1,argc,argv);
 				scan+=2;
 			}
 			else if ( strcmp(option,"-m") == 0 )
@@ -163,6 +169,7 @@ void main(int argc,const char ** argv)
 				printf("Max Convex Hulls        : %3d\r\n", desc.mMaxHullCount );
 				printf("Max Merged Convex Hulls : %3d\r\n", desc.mMaxMergeHullCount );
 				printf("Merge Threshold         : %0.2f\r\n", desc.mSmallClusterThreshold);
+				printf("Back Face Distance Factor: %0.2f\r\n", desc.mBackFaceDistanceFactor );
 				printf("\r\n");
 				hacd::HaU32 hullCount = HACD::gHACD->performHACD(desc);
 				if ( hullCount != 0 )

@@ -204,6 +204,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\HACD\src\dgAABBPolygonSoup.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\HACD\src\dgConvexHull3d.cpp"
 					>
 				</File>
@@ -212,11 +216,19 @@
 					>
 				</File>
 				<File
+					RelativePath="..\HACD\src\dgIntersections.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\HACD\src\dgMatrix.cpp"
 					>
 				</File>
 				<File
 					RelativePath="..\HACD\src\dgMeshEffect.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\HACD\src\dgPolygonSoupBuilder.cpp"
 					>
 				</File>
 				<File
@@ -236,11 +248,19 @@
 					>
 				</File>
 				<File
+					RelativePath="..\HACD\src\dgThreadHive.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\HACD\src\dgTree.cpp"
 					>
 				</File>
 				<File
 					RelativePath="..\HACD\src\dgTypes.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\HACD\src\dgWorkerThread.cpp"
 					>
 				</File>
 				<File
@@ -264,6 +284,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\HACD\include\dgAABBPolygonSoup.h"
+					>
+				</File>
+				<File
 					RelativePath="..\HACD\include\dgArray.h"
 					>
 				</File>
@@ -276,7 +300,15 @@
 					>
 				</File>
 				<File
+					RelativePath="..\HACD\include\dgGraph.h"
+					>
+				</File>
+				<File
 					RelativePath="..\HACD\include\dgHeap.h"
+					>
+				</File>
+				<File
+					RelativePath="..\HACD\include\dgIntersections.h"
 					>
 				</File>
 				<File
@@ -296,6 +328,14 @@
 					>
 				</File>
 				<File
+					RelativePath="..\HACD\include\dgPolygonSoupBuilder.h"
+					>
+				</File>
+				<File
+					RelativePath="..\HACD\src\dgPolygonSoupDatabase.h"
+					>
+				</File>
+				<File
 					RelativePath="..\HACD\include\dgPolyhedra.h"
 					>
 				</File>
@@ -305,6 +345,10 @@
 				</File>
 				<File
 					RelativePath="..\HACD\include\dgRefCounter.h"
+					>
+				</File>
+				<File
+					RelativePath="..\HACD\include\dgSimD_Instrutions.h"
 					>
 				</File>
 				<File
@@ -320,6 +364,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\HACD\include\dgThreadHive.h"
+					>
+				</File>
+				<File
 					RelativePath="..\HACD\include\dgTree.h"
 					>
 				</File>
@@ -329,6 +377,10 @@
 				</File>
 				<File
 					RelativePath="..\HACD\include\dgVector.h"
+					>
+				</File>
+				<File
+					RelativePath="..\HACD\include\dgWorkerThread.h"
 					>
 				</File>
 			</Filter>
