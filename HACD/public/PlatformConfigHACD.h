@@ -379,12 +379,18 @@ namespace hacd
 
 #define HACD_SPRINTF_S sprintf_s
 
+#ifdef HACD_X64
+typedef HaU64 HaSizeT;
+#else
+typedef HaU32 HaSizeT;
+#endif
+
+
+
 }; // end HACD namespace
 
 #define UANS hacd	// the user allocator namespace
 
 #include "PxVector.h"
-
-
 
 #endif
