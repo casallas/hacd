@@ -380,6 +380,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\HACD\public\JobSwarm.h"
+					>
+				</File>
+				<File
 					RelativePath="..\HACD\public\MergeHulls.h"
 					>
 				</File>
@@ -400,6 +404,30 @@
 					>
 				</File>
 			</Filter>
+		</Filter>
+		<Filter
+			Name="JobSwarm"
+			>
+			<File
+				RelativePath="..\jobswarm\dgThreadHive.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\jobswarm\dgThreadHive.h"
+				>
+			</File>
+			<File
+				RelativePath="..\jobswarm\dgWorkerThread.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\jobswarm\dgWorkerThread.h"
+				>
+			</File>
+			<File
+				RelativePath="..\jobswarm\JobSwarm.cpp"
+				>
+			</File>
 		</Filter>
 	</Files>
 	<Globals>

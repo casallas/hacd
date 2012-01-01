@@ -38,8 +38,15 @@ class dgConvexHull3DFace
 	dgConvexHull3DFace();
 	hacd::HaI32 m_index[3]; 
 	
-	void SetMark(hacd::HaI32 mark) {m_mark = mark;}
-	hacd::HaI32 GetMark() const {return m_mark;}
+	void SetMark(hacd::HaI32 mark) 
+	{
+		m_mark = mark;
+	}
+
+	hacd::HaI32 GetMark() const 
+	{
+		return m_mark;
+	}
 	dgList<dgConvexHull3DFace>::dgListNode* GetTwin(hacd::HaI32 index) const { return m_twin[index];}
 
 	private:

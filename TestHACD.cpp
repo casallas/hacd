@@ -35,6 +35,7 @@
 #include "PlatformConfigHACD.h"
 #include "wavefront.h"
 #include "HACD.h"
+#include "JobSwarm.h"
 
 namespace HACD
 {
@@ -92,8 +93,8 @@ public:
 		{
 			if ( message == mLastMessage )
 			{
-				printf("%c%c%c",8,8,8);
-				printf("%3d", percent );
+				printf("%c%c%c%c",8,8,8,8);
+				printf("%3d%c", percent,'%' );
 			}
 			else
 			{
@@ -119,7 +120,8 @@ void main(int argc,const char ** argv)
 		printf("-merge <count> : Maximum number of hulls after merging the HACD result.\r\n");
 		printf("-mergethreshold <volume> : Threshold below which hulls are merged if they are smaller than the given volume.\r\n");
 		printf("-c <concavity> : Between 0 and 1 are good ranges to try; default is 0.2.  The smaller the number, the more convex hulls are produced.\r\n");
-		printf("-b <backFaceDistanceFactor : The back face distance factor, default is 0.2.\r\n");
+		printf("-b <backFaceDistanceFactor : The back face distance factor, default is 0.01; set to larger values for hollow objects.\r\n");
+		printf("-t <threadCount> : Specifies the number of threads to use for a multi-threaded implementation\r\n");
 		printf("\r\n");
 		printf("Example: TestHACD hornbug.obj -m 40 -v 64\r\n");
 		printf("\r\n");
@@ -129,12 +131,18 @@ void main(int argc,const char ** argv)
 		HACD::HACD_API::Desc desc;
 		const char *wavefront = argv[1];
 		int scan = 2;
+		int threadCount = 0;
 		while ( scan < argc )
 		{
 			const char *option = argv[scan];
 			if ( strcmp(option,"-v") == 0 )
 			{
 				desc.mMaxHullVertices = getIntArg(scan+1,argc,argv);
+				scan+=2;
+			}
+			else if ( strcmp(option,"-t") == 0 )
+			{
+				threadCount  = getIntArg(scan+1,argc,argv);
 				scan+=2;
 			}
 			else if ( strcmp(option,"-b") == 0 )
@@ -167,7 +175,12 @@ void main(int argc,const char ** argv)
 				scan++;
 			}
 		}
-
+		JOB_SWARM::JobSwarmContext *jobSwarmContext = NULL;
+		if ( threadCount )
+		{
+			jobSwarmContext = JOB_SWARM::createJobSwarmContext(threadCount);
+			//jobSwarmContext->setUseThreads(false);
+		}
 		HACD::gHACD = HACD::createHACD_API();
 		if  ( HACD::gHACD )
 		{
@@ -193,7 +206,11 @@ void main(int argc,const char ** argv)
 				printf("Merge Threshold         : %0.2f\r\n", desc.mSmallClusterThreshold);
 				printf("Back Face Distance Factor: %0.2f\r\n", desc.mBackFaceDistanceFactor );
 				printf("\r\n");
+
+				desc.mJobSwarmContext = jobSwarmContext;
+
 				hacd::HaU32 hullCount = HACD::gHACD->performHACD(desc);
+
 				if ( hullCount != 0 )
 				{
 					printf("\r\n");
@@ -246,11 +263,14 @@ void main(int argc,const char ** argv)
 			{
 				printf("Failed to load Wavefront OBJ file '%s'\r\n",wavefront);
 			}
-
 		}
 		else
 		{
 			printf("Failed to load the HACD DLL\r\n");
+		}
+		if ( jobSwarmContext )
+		{
+			JOB_SWARM::releaseJobSwarmContext(jobSwarmContext);
 		}
 	}
 }

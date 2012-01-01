@@ -31,6 +31,11 @@
 
 */
 
+namespace JOB_SWARM
+{
+	class JobSwarmContext;
+};
+
 namespace HACD
 {
 
@@ -57,9 +62,11 @@ public:
 		hacd::HaF32			mConcavity;
 		hacd::HaF32			mSmallClusterThreshold;
 		hacd::HaF32			mBackFaceDistanceFactor;
+		JOB_SWARM::JobSwarmContext	*mJobSwarmContext;
 		hacd::ICallback*	mCallback;
 		void init(void)
 		{
+			mJobSwarmContext = NULL;
 			mTriangleCount = 0;
 			mVertexCount = 0;
 			mVertices = NULL;
@@ -69,7 +76,7 @@ public:
 			mMaxHullVertices = 64;
 			mConcavity = 0.2f;
 			mSmallClusterThreshold = 0.0f;
-			mBackFaceDistanceFactor = 0.2f;
+			mBackFaceDistanceFactor = 0.01f;
 			mCallback = NULL;
 		}
 	};

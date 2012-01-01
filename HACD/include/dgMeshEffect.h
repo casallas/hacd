@@ -28,6 +28,12 @@
 #include "dgVector.h"
 #include "dgPlane.h"
 #include "dgMatrix.h"
+#include "SparseArray.h"
+
+namespace JOB_SWARM
+{
+	class JobSwarmContext;
+}
 
 class dgMeshEffect;
 class dgMeshEffectSolidTree;
@@ -210,6 +216,7 @@ class dgMeshEffect: public dgPolyhedra, public dgRefCounter, public UANS::UserAl
 		hacd::HaF32 backFaceDistanceFactor, 
 		hacd::HaI32 maxHullsCount, 
 		hacd::HaI32 maxVertexPerHull,
+		JOB_SWARM::JobSwarmContext *jobSwarmContext,
 		hacd::ICallback *reportProgressCallback) const;
 
 	dgMeshEffect* dgMeshEffect::CreateSimplification(hacd::HaI32 maxVertexCount, hacd::ICallback *reportProgressCallback) const;
