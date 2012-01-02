@@ -82,7 +82,11 @@ public:
 					uv,sizeof(hacd::HaF32)*2,dummyIndex,
 					uv,sizeof(hacd::HaF32)*2,dummyIndex);
 
-				dgMeshEffect *result = mesh.CreateConvexApproximation(desc.mConcavity,desc.mBackFaceDistanceFactor,desc.mMaxHullCount,desc.mMaxHullVertices,desc.mJobSwarmContext, desc.mCallback);
+				dgMeshEffect *result;
+				{
+					TIMEIT("ConvexApproximation");
+					result = mesh.CreateConvexApproximation(desc.mConcavity,desc.mBackFaceDistanceFactor,desc.mMaxHullCount,desc.mMaxHullVertices,desc.mJobSwarmContext, desc.mCallback);
+				}
 
 				if ( result )
 				{

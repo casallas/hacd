@@ -429,3 +429,16 @@ hacd::HaI32 dgVertexListToIndexList (hacd::HaF32* const vertList, hacd::HaI32 st
 	
 	return count;
 }
+
+#ifdef HACD_WINDOWS
+#pragma comment(lib,"winmm.lib")
+#endif
+
+hacd::HaU32 dgSystemTime(void)
+{
+	hacd::HaU32 ret = 0;
+#ifdef HACD_WINDOWS
+	ret = timeGetTime();
+#endif
+	return ret;
+}

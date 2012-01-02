@@ -179,7 +179,7 @@ void main(int argc,const char ** argv)
 		if ( threadCount )
 		{
 			jobSwarmContext = JOB_SWARM::createJobSwarmContext(threadCount);
-			//jobSwarmContext->setUseThreads(false);
+//			jobSwarmContext->setUseThreads(false);
 		}
 		HACD::gHACD = HACD::createHACD_API();
 		if  ( HACD::gHACD )

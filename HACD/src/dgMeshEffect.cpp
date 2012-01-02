@@ -32,6 +32,7 @@
 
 #pragma warning(disable:4100 4324)
 
+static hacd::HaI32 gJobCount=0;
 
 class dgFlatClipEdgeAttr
 {
@@ -3758,26 +3759,39 @@ class dgHACDClusterGraph
 			mI1			= i1;
 			mI2			= i2;
 			mI3			= i3;
-			mJobComplete = false;
 		}
 
 		~TriangleConcavityJob(void)
 		{
-			HACD_ASSERT( mJobComplete );
 		}
 #pragma warning(push)
 #pragma warning(disable:4244)
 		virtual void job_process(void *userData,hacd::HaI32 userId)
 		{
 			mConcvavity = mHull->CalculateTriangleConcavity(*m_normal,mI1,mI2,mI3,(const dgBigVector *const)mPoints);
-			mJobComplete = true;
 		}
 #pragma warning(pop)
 
 		void startJob(JOB_SWARM::JobSwarmContext *jobSwarmContext)
 		{
+			gJobCount++;
 			jobSwarmContext->createSwarmJob(this,NULL,0);
 		}
+
+		virtual void job_onFinish(void *userData,hacd::HaI32 userId)  // runs in primary thread of the context
+		{
+			gJobCount--;
+		}
+		virtual void job_onCancel(void *userData,hacd::HaI32 userId)  // runs in primary thread of the context
+		{
+
+		}
+
+		static hacd::HaI32 getJobCount(void) 
+		{
+			return gJobCount;
+		}
+
 
 		hacd::HaF32				mConcvavity;
 		const void				*mPoints;
@@ -3786,7 +3800,6 @@ class dgHACDClusterGraph
 		hacd::HaI32				mI2;
 		hacd::HaI32				mI3;
 		const dgBigVector		*m_normal;
-		bool					mJobComplete;
 	};
 
 	// JobSwarm support goes here....
@@ -3818,7 +3831,10 @@ class dgHACDClusterGraph
 				}
 			}
 
-			while ( jobSwarmContext->processSwarmJobs() ); // process until all jobs are completed!
+			while ( TriangleConcavityJob::getJobCount() != 0 )
+			{
+				jobSwarmContext->processSwarmJobs();
+			}
 
 			for (hacd::HaU32 i=0; i<jobs.size(); i++)
 			{

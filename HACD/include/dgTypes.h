@@ -526,5 +526,45 @@ HACD_INLINE hacd::HaF32 dgCeil(hacd::HaF32 x)
 #define dgPow(x,y) hacd::HaF32 (pow(x,y))
 #define dgFmod(x,y) hacd::HaF32 (fmod(x,y))
 
+#define USE_TIMEIT 1
+
+#if USE_TIMEIT
+
+hacd::HaU32 dgSystemTime(void);
+
+class TimeIt
+{
+public:
+	TimeIt(const char *msg)
+	{
+		mMessage = msg;
+		mStartTime = dgSystemTime();
+	}
+	~TimeIt(void)
+	{
+		hacd::HaU32 dtime = dgSystemTime()-mStartTime;
+		if ( dtime >= 1000 )
+		{
+			printf("\r\n[TIMEIT] %s took %d seconds and %d milliseconds.\r\n", mMessage, dtime/1000, dtime%100 );
+		}
+		else
+		{
+			printf("\r\n[TIMEIT] %s took %d milliseconds.\r\n", mMessage, dtime );
+		}
+	}
+private:
+	const char *mMessage;
+	hacd::HaU32	mStartTime;
+
+};
+
+#define TIMEIT(x) TimeIt _timeIt(x)
+
+#else
+
+#define TIMEIT(x)
+
+#endif
+
 #endif
 

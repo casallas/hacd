@@ -41,6 +41,8 @@ class JobSwarmInterface
 {
 public:
   virtual void job_process(void *userData,hacd::HaI32 userId) = 0;   // RUNS IN ANOTHER THREAD!! MUST BE THREAD SAFE!
+  virtual void job_onFinish(void *userData,hacd::HaI32 userId) = 0;  // runs in primary thread of the context
+  virtual void job_onCancel(void *userData,hacd::HaI32 userId) = 0;  // runs in primary thread of the context
 };
 
 
@@ -50,8 +52,12 @@ class SwarmJob;
 class JobSwarmContext
 {
 public:
-	virtual void createSwarmJob(JobSwarmInterface *iface,void *userData,hacd::HaI32 userId) = 0; // creates a job to be processed and returns a handle.
-	virtual bool processSwarmJobs(void) = 0; // This is a pump loop run in the main thread to handle the disposition of finished and/or cancelled jobs.  Returns true if there are still outstanding jobs not yet full procesed.
+
+  virtual SwarmJob *   createSwarmJob(JobSwarmInterface *iface,void *userData,hacd::HaI32 userId) = 0; // creates a job to be processed and returns a handle.
+  virtual void         cancel(SwarmJob *job) = 0; // cancels the job, use cannot delete the memory until he receives the onCancel event!
+
+  virtual bool processSwarmJobs(void) = 0; // This is a pump loop run in the main thread to handle the disposition of finished and/or cancelled jobs.  Returns true if there are still outstanding jobs not yet full procesed.
+  virtual void         setUseThreads(bool state) = 0; // Whether or not to run in hardware threads.  This is for debugging only, threading is always true by default.
 };
 
 JobSwarmContext * createJobSwarmContext(hacd::HaU32 maxThreadCount=4); // create a JobSwarmContext with the give number of physical threads

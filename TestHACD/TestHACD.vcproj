@@ -409,23 +409,27 @@
 			Name="JobSwarm"
 			>
 			<File
-				RelativePath="..\jobswarm\dgThreadHive.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\jobswarm\dgThreadHive.h"
-				>
-			</File>
-			<File
-				RelativePath="..\jobswarm\dgWorkerThread.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\jobswarm\dgWorkerThread.h"
-				>
-			</File>
-			<File
 				RelativePath="..\jobswarm\JobSwarm.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\jobswarm\LockFreeQ.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\jobswarm\LockFreeQ.h"
+				>
+			</File>
+			<File
+				RelativePath="..\jobswarm\pool.h"
+				>
+			</File>
+			<File
+				RelativePath="..\jobswarm\ThreadConfig.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\jobswarm\ThreadConfig.h"
 				>
 			</File>
 		</Filter>
