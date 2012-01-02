@@ -9,7 +9,7 @@
 // lock free not working on linux
 #define USE_LOCK_FREE 0
 #else
-#define USE_LOCK_FREE 1 // set this to zero, to use locks
+#define USE_LOCK_FREE 0 // set this to zero, to use locks
 #endif
 
 /*!

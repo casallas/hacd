@@ -293,10 +293,18 @@ namespace hacd
 
 #define HACD_SIGN_BITMASK		0x80000000
 
-	// avoid unreferenced parameter warning (why not just disable it?)
-	// PT: or why not just omit the parameter's name from the declaration????
-#define HACD_ALLOC_ALIGNED(x,y) ::_aligned_malloc(x,y)
-#define HACD_ALLOC(x) ::_aligned_malloc(x,16)
+extern size_t gAllocCount;
+extern size_t gAllocSize;
+
+HACD_INLINE void * AllocAligned(size_t size,size_t alignment)
+{
+	gAllocSize+=size;
+	gAllocCount++;
+	return ::_aligned_malloc(size,alignment);
+}
+
+#define HACD_ALLOC_ALIGNED(x,y) hacd::AllocAligned(x,y)
+#define HACD_ALLOC(x) hacd::AllocAligned(x,16)
 #define HACD_FREE(x) ::_aligned_free(x)
 
 #define HACD_ASSERT(x) assert(x)

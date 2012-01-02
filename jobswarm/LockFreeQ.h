@@ -58,7 +58,7 @@ namespace LOCK_FREE_Q
 
     void init(int size)
     {
-      delete []m_Data;
+      HACD_FREE((void *)m_Data);
       m_Read = 0;
       m_Write = 0;
       m_Size = size;

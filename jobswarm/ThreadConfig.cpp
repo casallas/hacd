@@ -265,7 +265,7 @@ public:
   {
     mInterface = iface;
 	#if defined(WIN32) || defined(_XBOX)
-   	  mThread     = CreateThread(0, 0, _ThreadWorkerFunc, this, 0, 0);
+   	  mThread     = CreateThread(0, 0, _ThreadWorkerFunc, this, CREATE_SUSPENDED, NULL );
     #elif defined(__APPLE__) || defined(__linux__)
 	  VERIFY( pthread_create(&mThread, NULL, _ThreadWorkerFunc, this) == 0 );
 	#endif
@@ -285,6 +285,20 @@ public:
   void onJobExecute(void)
   {
     mInterface->threadMain();
+  }
+
+  virtual void Suspend(void)
+  {
+#ifdef HACD_WINDOWS
+	SuspendThread(mThread);
+#endif
+  }
+
+  virtual void Resume(void) 
+  {
+#ifdef HACD_WINDOWS
+	  ResumeThread(mThread);
+#endif
   }
 
 private:
@@ -375,32 +389,34 @@ public:
 	#endif
   }
 
-  virtual void waitForSingleObject(unsigned int ms)
-  {
-	#if defined(WIN32) || defined(_XBOX)
-    if ( mEvent )
-    {
-      ::WaitForSingleObject(mEvent,ms);
-    }
-	#elif defined(__APPLE__) || defined(__linux__)
-      VERIFY( pthread_mutex_lock(&mEventMutex) == 0 );
-	  if (ms == 0xffffffff)
-	  {
-		  VERIFY( pthread_cond_wait(&mEvent, &mEventMutex) == 0 );
-	  }
-	  else
-	  {
-	      struct timespec ts;
-	      clock_gettime(CLOCK_REALTIME, &ts);
-	      ts.tv_nsec += ms * 1000000;
-	      ts.tv_sec += ts.tv_nsec / 1000000000;
-	      ts.tv_nsec %= 1000000000;
-		  int result = pthread_cond_timedwait(&mEvent, &mEventMutex, &ts);
-		  assert(result == 0 || result == ETIMEDOUT);
-	  }
-	  VERIFY( pthread_mutex_unlock(&mEventMutex) == 0 );
-	#endif
-  }
+	virtual void waitForSingleObject(unsigned int ms)
+	{
+		#if defined(WIN32) || defined(_XBOX)
+		if ( mEvent )
+		{
+			DWORD result = ::WaitForSingleObject(mEvent,ms);
+			HACD_FORCE_PARAMETER_REFERENCE(result);
+			HACD_ASSERT( result == WAIT_OBJECT_0 );
+		}
+		#elif defined(__APPLE__) || defined(__linux__)
+		VERIFY( pthread_mutex_lock(&mEventMutex) == 0 );
+		if (ms == 0xffffffff)
+		{
+			VERIFY( pthread_cond_wait(&mEvent, &mEventMutex) == 0 );
+		}
+		else
+		{
+			struct timespec ts;
+			clock_gettime(CLOCK_REALTIME, &ts);
+			ts.tv_nsec += ms * 1000000;
+			ts.tv_sec += ts.tv_nsec / 1000000000;
+			ts.tv_nsec %= 1000000000;
+			int result = pthread_cond_timedwait(&mEvent, &mEventMutex, &ts);
+			assert(result == 0 || result == ETIMEDOUT);
+		}
+		VERIFY( pthread_mutex_unlock(&mEventMutex) == 0 );
+		#endif
+	}
 
 private:
   #if defined(WIN32) || defined(_XBOX)

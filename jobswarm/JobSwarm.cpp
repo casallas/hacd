@@ -37,6 +37,10 @@
 
 JOB_SWARM::JobSwarmContext *gJobSwarmContext=0;
 
+#pragma warning(disable:4996)
+
+#define MAX_THREADS 64
+
 namespace JOB_SWARM
 {
 
@@ -83,6 +87,7 @@ public:
 	// run from thread of course
 	void onExecute(void)
 	{
+		HACD_ASSERT(mInterface);
 		mInterface->job_process(mUserData,mUserId);
 	}
 
@@ -121,62 +126,81 @@ public:
 
 	ThreadWorker(void)
 	{
-		mActiveThreadCount = NULL;
 		mJobScheduler = 0;
 		mExit         = false;
-		mBusy         = 0;
 		mThread     = 0;
+		mWaiting = true;
+		mWaitPending = false;
+		mExitComplete = false;
+		mThreadFlag = 0;
 		mFinished.init(MAX_COMPLETION);
 	}
 
-    ~ThreadWorker(void)
-    {
-      release();
-    }
-
-    void release(void)
-    {
-      THREAD_CONFIG::tc_releaseThreadEvent(mBusy);
-      THREAD_CONFIG::tc_releaseThread(mThread);
-      mBusy = 0;
-      mThread = 0;
-    }
-
-	void setJobScheduler(JobScheduler *job,hacd::HaI32 *activeThreadCount);
-
-    // occurs in another thread
-    void threadMain(void);
-
-    SwarmJob * getFinished(void)
-    {
-      SwarmJob *ret = 0;
-      mFinished.pop(ret);
-      return ret;
-    }
-
-    void setExit(void)
-    {
-      mExit = true;
-      mBusy->setEvent(); // force a signal on the event!
-    }
-
-	void wakeUp(void)
+	~ThreadWorker(void)
 	{
-		mBusy->setEvent(); // force a signal on the event!
+		release();
 	}
+
+	void release(void)
+	{
+		setExit();
+		while ( !mExitComplete )
+		{
+			THREAD_CONFIG::tc_sleep(0);
+		}
+		THREAD_CONFIG::tc_releaseThread(mThread);
+		mThread = 0;
+		mWaiting = true;
+		mWaitPending = false;
+	}
+
+	void setJobScheduler(JobScheduler *job,hacd::HaU32 threadFlag);
+
+	// occurs in another thread
+	void threadMain(void);
+
+	SwarmJob * getFinished(void)
+	{
+		SwarmJob *ret = 0;
+		mFinished.pop(ret);
+		return ret;
+	}
+
+	void setExit(void)
+	{
+		mExit = true;
+		wakeUp();
+	}
+
+	bool wakeUp(void)
+	{
+		bool ret = mWaiting;
+
+		if ( mWaiting )
+		{
+			mWaiting = false; // no longer waiting, we have woken up the thread
+			mThread->Resume();
+		}
+
+		return ret;
+	}
+
+	bool processWaitPending(void);
 
   private:
 
-	  void wait(void); // wait until we are signalled again.
+	void wait(void); // wait until we are signalled again.
 
 
-	  hacd::HaI32				*mActiveThreadCount;	// shared integer for the number of threads currently active doing work.
-    bool						mExit;					// exit condition
-    THREAD_CONFIG::Thread		*mThread;
-    THREAD_CONFIG::ThreadEvent	*mBusy;
-    JobScheduler				*mJobScheduler;    // provides new jobs to perform
-    LOCK_FREE_Q::CQueue< SwarmJob * > mFinished;     // jobs that have been completed and may be reported back to the application.
-  };
+	hacd::HaU32					mThreadFlag;	// bit flag identifying this thread
+	bool						mWaitPending;
+	bool						mWaiting;
+	bool						mExit;					// exit condition
+	bool						mExitComplete;
+	THREAD_CONFIG::Thread		*mThread;
+	JobScheduler				*mJobScheduler;			// provides new jobs to perform
+	LOCK_FREE_Q::CQueue< SwarmJob * > mFinished;		// jobs that have been completed and may be reported back to the application.
+};
 
   class JobScheduler : public JobSwarmContext, public UANS::UserAllocated
   {
@@ -184,17 +208,24 @@ public:
 
     JobScheduler(hacd::HaI32 maxThreadCount)
     {
-		mActiveThreadCount = 0;
+		if ( maxThreadCount > MAX_THREADS )
+		{
+			maxThreadCount = MAX_THREADS;
+		}
+		mPendingCount = 0;
 		mUseThreads = true;
 		maxThreadCount = maxThreadCount;
 		mPending = LOCK_FREE_Q::createLockFreeQ();
 		mJobs.Set(100,100,100000000,"JobScheduler->mJobs",__FILE__,__LINE__);
-		mActiveThreadCount = maxThreadCount; // initial active thread count; until each thread puts itself back to sleep
 		mMaxThreadCount = maxThreadCount;
 		mThreads = HACD_NEW(ThreadWorker)[mMaxThreadCount]; // the number of worker threads....
+		mPendingSleepCount = 0;
+		mThreadAwakeCount = 0;
 		for (hacd::HaU32 i=0; i<mMaxThreadCount; i++)
 		{
-			mThreads[i].setJobScheduler(this,&mActiveThreadCount);
+			mThreadAsleep[i] = 1;
+			mPendingSleep[i] = 0;
+			mThreads[i].setJobScheduler(this,i);
 		}
 	}
 
@@ -207,27 +238,12 @@ public:
 	// Happens in main thread
 	SwarmJob * createSwarmJob(JobSwarmInterface *tji,void *userData,hacd::HaI32 userId)
 	{
-		SwarmJob *vret[2] = { mJobs.GetFreeLink() , mJobs.GetFreeLink() };
-		//
-		SwarmJob *ret=0;
-		if( vret[0]==mPending->getHead() )
-		{
-			ret=vret[1];
-			mJobs.Release( vret[0] );
-		}
-		else
-		{
-			ret=vret[0];
-			mJobs.Release( vret[1] );
-		}
-
+		SwarmJob *ret = mJobs.GetFreeLink();
 		//
 		new ( ret ) SwarmJob(tji,userData,userId);
-//		printf("Creating job\r\n");
 		mPending->enqueue(ret);
+		THREAD_CONFIG::tc_atomicAdd(&mPendingCount,1);
 		wakeUpThreads(); // if the worker threads are aslpeep; wake them up to process this job
-
-		//
 		return ret;
 	}
 
@@ -237,7 +253,9 @@ public:
 		bool completion = true;
 
 		THREAD_CONFIG::tc_sleep(0); // give up timeslice to threads
-
+		applySleep(); // if there are any threads waiting to go to sleep; let's put them to sleep
+		wakeUpThreads(); // if there is work to be done, then wake up the threads
+		// de-queue all completed jobs in the main thread.
 		while ( completion )
 		{
 			completion = false;
@@ -247,12 +265,24 @@ public:
 				if ( job )
 				{
 					completion = true;
-//					printf("Notify job complete.\r\n");
 					job->notifyCompletion();
 					mJobs.Release(job);
 				}
 			}
 		}
+#if 1
+		// do up to one job in the main thread each time this is called.
+		if ( mJobs.GetUsedCount() )
+		{
+			SwarmJob *job = getJob();
+			if ( job )
+			{
+				job->onExecute();
+				job->notifyCompletion();
+				mJobs.Release(job);
+			}
+		}
+#endif
 		if ( !mUseThreads )
 		{
 			hacd::HaU32 stime = THREAD_CONFIG::tc_timeGetTime();
@@ -278,10 +308,6 @@ public:
 				if ( dtime > 30 ) break;
 			}
 		}
-		if ( mJobs.GetUsedCount() != 0 )
-		{
-			wakeUpThreads(); // if there is work to be done, then wake up the threads
-		}
 		return mJobs.GetUsedCount() ? true : false;
 	}
 
@@ -292,6 +318,10 @@ public:
 		if ( mUseThreads )
 		{
 			ret = static_cast< SwarmJob *>(mPending->dequeue());
+			if ( ret )
+			{
+				THREAD_CONFIG::tc_atomicAdd(&mPendingCount,-1);
+			}
 		}
 		return ret;
 	}
@@ -309,57 +339,102 @@ public:
 
 	void wakeUpThreads(void)
 	{
-		if ( mActiveThreadCount != (hacd::HaI32)mMaxThreadCount )
+		hacd::HaU32 jobsWaiting = mPendingCount;
+
+		if ( jobsWaiting ) // if there are any threads not currently running jobs...
 		{
 			for (hacd::HaU32 i=0; i<mMaxThreadCount; i++)
 			{
-				mThreads[i].wakeUp();
+				if ( mThreadAsleep[i] )
+				{
+					if ( mThreads[i].wakeUp() ) // enable the signal on this thread to wake it up to process jobs
+					{
+						mThreadAwakeCount++;
+						mThreadAsleep[i] = 0;
+						jobsWaiting--;
+						if ( jobsWaiting == 0 )  // if we have woken up enough threads to consume the pending jobs
+							break;
+					}
+					else
+					{
+						HACD_ALWAYS_ASSERT(); // should always be able to wake it up!
+					}
+				}
 			}
 		}
 	}
 
-  private:
-
-	  
-    bool                    mUseThreads;
-    hacd::HaU32            mMaxThreadCount;
-    LOCK_FREE_Q::LockFreeQ *mPending;
-    Pool< SwarmJob >       mJobs;
-    ThreadWorker           *mThreads;
-	hacd::HaI32				mActiveThreadCount;
-
-
-  };
-
-
-  void ThreadWorker::setJobScheduler(JobScheduler *job,hacd::HaI32 *activeThreadCount)
-  {
-	mActiveThreadCount = activeThreadCount;
-	mJobScheduler = job;
-	mBusy         = THREAD_CONFIG::tc_createThreadEvent();
-	mThread       = THREAD_CONFIG::tc_createThread(this);
-  }
-
-	void ThreadWorker::threadMain(void)
+	void putToSleep(hacd::HaU32 threadIndex)
 	{
-		while ( !mExit )
+		HACD_ASSERT( mPendingSleep[threadIndex] == false );
+		THREAD_CONFIG::tc_atomicAdd(&mPendingSleep[threadIndex],1);
+		THREAD_CONFIG::tc_atomicAdd(&mPendingSleepCount,1);
+	}
+
+	// always called from the main thread.  puts to sleep any treads that had no work to do.
+	void applySleep(void)
+	{
+		if ( mPendingSleepCount ) // if there are any threads pending to be put to sleep...
+		{
+			for (hacd::HaU32 i=0; i<mMaxThreadCount; i++)
+			{
+				if ( mPendingSleep[i] )
+				{
+					mThreadAwakeCount--;
+					mThreadAsleep[i] = 1; // mark it as actually being asleep now.
+					THREAD_CONFIG::tc_atomicAdd(&mPendingSleep[i],-1);
+					THREAD_CONFIG::tc_atomicAdd(&mPendingSleepCount,-1);
+					mThreads[i].processWaitPending();
+				}
+			}
+//			HACD_ASSERT(mPendingSleepCount==0);
+		}
+	}
+
+private:
+	bool					mUseThreads;
+	hacd::HaU32				mMaxThreadCount;
+	LOCK_FREE_Q::LockFreeQ *mPending;
+	Pool< SwarmJob >		mJobs;
+	ThreadWorker			*mThreads;
+	hacd::HaI32				mPendingCount;
+	hacd::HaU32				mWaitPending;
+	hacd::HaI32				mPendingSleepCount;
+	hacd::HaI32				mThreadAwakeCount;
+	hacd::HaI32				mPendingSleep[MAX_THREADS];
+	hacd::HaI32				mThreadAsleep[MAX_THREADS];
+};
+
+
+void ThreadWorker::setJobScheduler(JobScheduler *job,hacd::HaU32 threadFlag)
+{
+	mThreadFlag = threadFlag;
+	mJobScheduler = job;
+	mWaiting	= true; // threads begin in a suspended state!
+	mThread		= THREAD_CONFIG::tc_createThread(this);
+}
+
+void ThreadWorker::threadMain(void)
+{
+	while ( !mExit )
+	{
+		if ( mWaitPending || mWaiting )
+		{
+			// already asleep, or waiting to be put to sleep by the main thread...
+			THREAD_CONFIG::tc_sleep(0);
+		}
+		else
 		{
 			if ( !mFinished.isFull() )
 			{
 				SwarmJob *job = mJobScheduler->getJob(); // get a new job to perform.
-				if ( job )
+				while ( job )
 				{
-					//printf("Found job to work on.\r\n");
 					job->onExecute();              // execute the job.
-					//printf("Finished job, putting it on the finished queue\r\n");
 					mFinished.push(job);
+					job = mJobScheduler->getJob(); // get a new job to perform.
 				}
-				else
-				{
-					//printf("No work to be done; going to sleep\r\n");
-					wait();
-					//printf("Thread is woken back up.\r\n");
-				}
+				wait();
 			}
 			else
 			{
@@ -367,34 +442,51 @@ public:
 			}
 		}
 	}
+	mExitComplete = true;
+}
 
-	void ThreadWorker::wait(void)
+void ThreadWorker::wait(void)
+{
+	HACD_ASSERT(!mWaitPending);
+	HACD_ASSERT(!mWaiting);
+	mWaitPending = true;
+	mJobScheduler->putToSleep(mThreadFlag);
+}
+
+bool ThreadWorker::processWaitPending(void)
+{
+	bool ret = mWaitPending;
+	HACD_ASSERT(mWaiting==false);
+	HACD_ASSERT(mWaitPending);
+	if ( mWaitPending )
 	{
-		THREAD_CONFIG::tc_atomicAdd(mActiveThreadCount,-1); // subtract one from the active thread count, to indicate that we are now asleep waiting for more work.
-		mBusy->resetEvent();
-		mBusy->waitForSingleObject(0xFFFFFFFF);
-		THREAD_CONFIG::tc_atomicAdd(mActiveThreadCount,1); // subtract one from the active thread count, to indicate that we are now asleep waiting for more work.
+		if ( mWaiting == false )
+		{
+			mThread->Suspend(); // suspend thread execution
+			mWaiting = true; // indicate that we are currently waiting to be freshly signalled
+		}
+		mWaitPending = false;
 	}
+	return ret;
+}
 
+JobSwarmContext * createJobSwarmContext(hacd::HaU32 maxThreads)
+{
+	JobScheduler *tjf = HACD_NEW(JobScheduler)(maxThreads);
+	JobSwarmContext *ret = static_cast< JobSwarmContext *>(tjf);
+	return ret;
+}
 
-
-  JobSwarmContext * createJobSwarmContext(hacd::HaU32 maxThreads)
-  {
-    JobScheduler *tjf = HACD_NEW(JobScheduler)(maxThreads);
-    JobSwarmContext *ret = static_cast< JobSwarmContext *>(tjf);
-    return ret;
-  }
-
-  bool releaseJobSwarmContext(JobSwarmContext *tc)
-  {
-    bool ret = false;
-    if ( tc )
-    {
-      JobScheduler *tjf = static_cast< JobScheduler *>(tc);
-      delete tjf;
-      ret = true;
-    }
-    return ret;
-  }
+bool releaseJobSwarmContext(JobSwarmContext *tc)
+{
+	bool ret = false;
+	if ( tc )
+	{
+		JobScheduler *tjf = static_cast< JobScheduler *>(tc);
+		delete tjf;
+		ret = true;
+	}
+	return ret;
+}
 
 }; // END OF NAMESPACE

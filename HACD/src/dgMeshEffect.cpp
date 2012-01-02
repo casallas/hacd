@@ -2965,7 +2965,7 @@ class dgHACDClusterGraph
 				}
 			}
 
-			SparseArray< hacd::HaSizeT > tested( 2048 );
+			SparseArrayFixed< hacd::HaSizeT, 32, 2048 > tested;
 			hacd::HaSizeT index = (hacd::HaSizeT)face;
 			tested[index] = index;
 
@@ -3641,9 +3641,6 @@ class dgHACDClusterGraph
 		m_mark ++;
 		for (dgListNode* clusterNodeA = GetFirst(); clusterNodeA; clusterNodeA = clusterNodeA->GetNext()) 
 		{
-			// call the progress callback
-			//ReportProgress();
-
 			for (dgGraphNode<dgHACDCluster, dgHACDEdge>::dgListNode* edgeNodeAB = clusterNodeA->GetInfo().GetFirst(); edgeNodeAB; edgeNodeAB = edgeNodeAB->GetNext()) 
 			{
 				dgHACDEdge& edgeAB = edgeNodeAB->GetInfo().m_edgeData;
@@ -3759,16 +3756,20 @@ class dgHACDClusterGraph
 			mI1			= i1;
 			mI2			= i2;
 			mI3			= i3;
+			mExecuted = false;
 		}
 
 		~TriangleConcavityJob(void)
 		{
+			HACD_ASSERT(mExecuted);
 		}
 #pragma warning(push)
 #pragma warning(disable:4244)
 		virtual void job_process(void *userData,hacd::HaI32 userId)
 		{
+			HACD_ASSERT(!mExecuted);
 			mConcvavity = mHull->CalculateTriangleConcavity(*m_normal,mI1,mI2,mI3,(const dgBigVector *const)mPoints);
+			mExecuted = true;
 		}
 #pragma warning(pop)
 
@@ -3800,6 +3801,7 @@ class dgHACDClusterGraph
 		hacd::HaI32				mI2;
 		hacd::HaI32				mI3;
 		const dgBigVector		*m_normal;
+		bool					mExecuted;
 	};
 
 	// JobSwarm support goes here....

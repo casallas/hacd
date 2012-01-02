@@ -67,6 +67,8 @@ public:
 class Thread
 {
 public:
+	virtual void Suspend(void) = 0;
+	virtual void Resume(void) = 0;
 };
 
 Thread      * tc_createThread(ThreadInterface *tinterface);

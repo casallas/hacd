@@ -442,3 +442,9 @@ hacd::HaU32 dgSystemTime(void)
 #endif
 	return ret;
 }
+
+namespace hacd
+{
+size_t gAllocCount=0;
+size_t gAllocSize=0;
+};
