@@ -30,6 +30,11 @@
 
 */
 
+namespace JOB_SWARM
+{
+	class JobSwarmContext;
+}
+
 namespace HACD
 {
 
@@ -53,7 +58,8 @@ public:
 									hacd::HaU32	mergeHullCount,
 									hacd::HaF32 smallClusterThreshold,
 									hacd::HaU32 maxHullVertices,
-									hacd::ICallback *callback) = 0;
+									hacd::ICallback *callback,
+									JOB_SWARM::JobSwarmContext *jobSwarmContext) = 0;
 
 
 	virtual void release(void) = 0;

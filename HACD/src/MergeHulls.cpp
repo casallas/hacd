@@ -1,7 +1,7 @@
 #include "MergeHulls.h"
 #include "ConvexHull.h"
 #include "SparseArray.h"
-
+#include "JobSwarm.h"
 #include <string.h>
 #include <math.h>
 
@@ -39,6 +39,8 @@ namespace HACD
 {
 
 typedef SparseArray< HaF32 > TestedMap;
+
+static int gCombineCount=0;
 
 static HaF32 fm_computeBestFitAABB(HaU32 vcount,const HaF32 *points,HaU32 pstride,HaF32 *bmin,HaF32 *bmax) // returns the diagonal distance
 {
@@ -198,7 +200,8 @@ public:
 		hacd::HaU32 mergeHullCount,
 		hacd::HaF32 smallClusterThreshold,
 		hacd::HaU32 maxHullVertices,
-		hacd::ICallback *callback)
+		hacd::ICallback *callback,
+		JOB_SWARM::JobSwarmContext *jobSwarmContext)
 	{
 		mGuid = 0;
 
@@ -233,7 +236,7 @@ public:
 				hacd::HaF32 fraction = (hacd::HaF32)mergeIndex / (hacd::HaF32)mergeCount;
 				callback->ReportProgress("Merging", fraction );
 			}
-			bool combined = combineHulls(); // mege smallest hulls first, up to the max merge count.
+			bool combined = combineHulls(jobSwarmContext); // mege smallest hulls first, up to the max merge count.
 			if ( !combined ) break;
 			mergeIndex++;
 		} 
@@ -278,7 +281,7 @@ public:
 		delete this;
 	}
 
-	HaF32 canMerge(CHull *a,CHull *b)
+	static HaF32 canMerge(CHull *a,CHull *b)
 	{
 		if ( !a->overlap(*b) ) return 0; // if their AABB's (with a little slop) don't overlap, then return.
 
@@ -340,7 +343,52 @@ public:
 		return ret;
 	}
 
-	bool combineHulls(void)
+	class CombineVolumeJob : public JOB_SWARM::JobSwarmInterface
+	{
+	public:
+		CombineVolumeJob(CHull *hullA,CHull *hullB,HaU32 hashIndex)
+		{
+			mHullA		= hullA;
+			mHullB		= hullB;
+			mHashIndex	= hashIndex;
+		}
+
+		void startJob(JOB_SWARM::JobSwarmContext *jobSwarmContext)
+		{
+			if ( jobSwarmContext )
+			{
+				gCombineCount++;
+				jobSwarmContext->createSwarmJob(this,NULL,0);
+			}
+			else
+			{
+				job_process(NULL,0);
+			}
+		}
+
+		virtual void job_process(void *userData,hacd::HaI32 userId)   // RUNS IN ANOTHER THREAD!! MUST BE THREAD SAFE!
+		{
+			mCombinedVolume = canMerge(mHullA,mHullB);
+		}
+
+		virtual void job_onFinish(void *userData,hacd::HaI32 userId)  // runs in primary thread of the context
+		{
+			gCombineCount--;
+		}
+
+		virtual void job_onCancel(void *userData,hacd::HaI32 userId)  // runs in primary thread of the context
+		{
+
+		}
+
+	//private:
+		HaU32	mHashIndex;
+		CHull	*mHullA;
+		CHull	*mHullB;
+		HaF32	mCombinedVolume;
+	};
+
+	bool combineHulls(JOB_SWARM::JobSwarmContext *jobSwarmContext)
 	{
 		bool combine = false;
 		// each new convex hull is given a unique guid.
@@ -348,16 +396,16 @@ public:
 		CHullVector output;
 		HaU32 count = (HaU32)mChulls.size();
 
-		CHull *mergeA = NULL;
-		CHull *mergeB = NULL;
-
 		// Early out to save walking all the hulls. Hulls are combined based on 
 		// a target number or on a number of generated hulls.
 		bool mergeTargetMet = (HaU32)mChulls.size() <= mMergeNumHulls;
 		if (mergeTargetMet && (mSmallClusterThreshold == 0.0f))
-			return false;
-		
-		HaF32 bestVolume = mTotalVolume;
+			return false;		
+
+		hacd::vector< CombineVolumeJob > jobs;
+
+		// First, see if there are any pairs of hulls who's combined volume we have not yet calculated.
+		// If there are, then we add them to the jobs list
 		{
 			for (HaU32 i=0; i<count; i++)
 			{
@@ -374,25 +422,65 @@ public:
 					{
 						hashIndex = (cr->mGuid << 16 ) | match->mGuid;
 					}
-					HaF32 combinedVolume;
+
 					HaF32 *v = mHasBeenTested->find(hashIndex);
+
 					if ( v == NULL )
 					{
-						combinedVolume = canMerge(cr,match);
-						(*mHasBeenTested)[hashIndex] = combinedVolume;
+						CombineVolumeJob job(cr,match,hashIndex);
+						jobs.push_back(job);
+						(*mHasBeenTested)[hashIndex] = 0.0f;  // assign it to some value so we don't try to create more than one job for it.
+					}
+				}
+			}
+		}
+
+		// ok..we have posted all of the jobs, let's let's solve them in parallel
+		for (hacd::HaU32 i=0; i<jobs.size(); i++)
+		{
+			jobs[i].startJob(jobSwarmContext);
+		}
+
+		// solve all of them in parallel...
+		while ( gCombineCount != 0 )
+		{
+			jobSwarmContext->processSwarmJobs(); // solve merged hulls in parallel
+		}
+
+		// once we have the answers, now put the results into the hash table.
+		for (hacd::HaU32 i=0; i<jobs.size(); i++)
+		{
+			CombineVolumeJob &job = jobs[i];
+			(*mHasBeenTested)[job.mHashIndex] = job.mCombinedVolume;
+		}
+
+		HaF32 bestVolume = mTotalVolume;
+		CHull *mergeA = NULL;
+		CHull *mergeB = NULL;
+		// now find the two hulls which merged produce the smallest combined volume.
+		{
+			for (HaU32 i=0; i<count; i++)
+			{
+				CHull *cr = mChulls[i];
+				for (HaU32 j=i+1; j<count; j++)
+				{
+					CHull *match = mChulls[j];
+					HaU32 hashIndex;
+					if ( match->mGuid < cr->mGuid )
+					{
+						hashIndex = (match->mGuid << 16) | cr->mGuid;
 					}
 					else
 					{
-						combinedVolume = *v;
+						hashIndex = (cr->mGuid << 16 ) | match->mGuid;
 					}
-					if ( combinedVolume != 0 )
+					HaF32 *v = mHasBeenTested->find(hashIndex);
+					HACD_ASSERT(v);
+					if ( v && *v != 0 && *v < bestVolume )
 					{
-						if ( combinedVolume < bestVolume )
-						{
-							bestVolume = combinedVolume;
-							mergeA = cr;
-							mergeB = match;
-						}
+						bestVolume = *v;
+						mergeA = cr;
+						mergeB = match;
 					}
 				}
 			}
@@ -407,6 +495,7 @@ public:
 
 			HaF32 volumeA = mergeA->mVolume;
 			HaF32 volumeB = mergeB->mVolume;
+
 			if ( merge )
 			{
 				combine = true;
@@ -421,7 +510,6 @@ public:
 				}
 				delete mergeA;
 				delete mergeB;
-
 				// Remove the old volumes and add the new one.
 				mTotalVolume -= (volumeA + volumeB);
 				mTotalVolume += merge->mVolume;

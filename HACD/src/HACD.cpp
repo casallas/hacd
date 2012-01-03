@@ -173,7 +173,10 @@ public:
 					inputHulls.push_back(mh);
 				}
 
-				ret = mhi->mergeHulls(inputHulls,outputHulls,desc.mMaxMergeHullCount, desc.mSmallClusterThreshold + FLT_EPSILON, desc.mMaxHullVertices, desc.mCallback);
+				{
+					TIMEIT("MergeHulls");
+					ret = mhi->mergeHulls(inputHulls,outputHulls,desc.mMaxMergeHullCount, desc.mSmallClusterThreshold + FLT_EPSILON, desc.mMaxHullVertices, desc.mCallback, desc.mJobSwarmContext);
+				}
 
 				for (HaU32 i=0; i<ret; i++)
 				{
