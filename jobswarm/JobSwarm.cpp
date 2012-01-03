@@ -447,6 +447,9 @@ void ThreadWorker::threadMain(void)
 
 void ThreadWorker::wait(void)
 {
+	if ( !mExit )
+		return;
+
 	HACD_ASSERT(!mWaitPending);
 	HACD_ASSERT(!mWaiting);
 	mWaitPending = true;

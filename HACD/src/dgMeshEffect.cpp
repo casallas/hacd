@@ -3873,6 +3873,7 @@ class dgHACDClusterGraph
 				TriangleConcavityJob &job = jobs1[i];
 				job.startJob(jobSwarmContext);
 			}
+			jobSwarmContext->processSwarmJobs();
 			for (hacd::HaU32 i=0; i<jobs2.size(); i++)
 			{
 				TriangleConcavityJob &job = jobs2[i];
