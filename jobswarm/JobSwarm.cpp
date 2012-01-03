@@ -270,7 +270,7 @@ public:
 				}
 			}
 		}
-#if 1
+#if 0
 		// do up to one job in the main thread each time this is called.
 		if ( mJobs.GetUsedCount() )
 		{

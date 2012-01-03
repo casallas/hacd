@@ -3740,7 +3740,7 @@ class dgHACDClusterGraph
 		}
 	}
 
-	class TriangleConcavityJob : public JOB_SWARM::JobSwarmInterface, public UANS::UserAllocated
+	class TriangleConcavityJob : public JOB_SWARM::JobSwarmInterface
 	{
 	public:
 		TriangleConcavityJob(dgHACDConveHull *hull,
@@ -3756,20 +3756,16 @@ class dgHACDClusterGraph
 			mI1			= i1;
 			mI2			= i2;
 			mI3			= i3;
-			mExecuted = false;
 		}
 
 		~TriangleConcavityJob(void)
 		{
-			HACD_ASSERT(mExecuted);
 		}
 #pragma warning(push)
 #pragma warning(disable:4244)
 		virtual void job_process(void *userData,hacd::HaI32 userId)
 		{
-			HACD_ASSERT(!mExecuted);
 			mConcvavity = mHull->CalculateTriangleConcavity(*m_normal,mI1,mI2,mI3,(const dgBigVector *const)mPoints);
-			mExecuted = true;
 		}
 #pragma warning(pop)
 
@@ -3801,21 +3797,20 @@ class dgHACDClusterGraph
 		hacd::HaI32				mI2;
 		hacd::HaI32				mI3;
 		const dgBigVector		*m_normal;
-		bool					mExecuted;
 	};
 
+	
 	// JobSwarm support goes here....
 	hacd::HaF64 CalculateConcavity(dgHACDConveHull& hull,
 									const dgMeshEffect& mesh,
 									const dgHACDCluster& cluster,
-									JOB_SWARM::JobSwarmContext *jobSwarmContext)
+									JOB_SWARM::JobSwarmContext *jobSwarmContext,
+									hacd::vector< TriangleConcavityJob > &jobs,
+									hacd::HaF64 &concavity)
+
 	{
-
-		hacd::HaF64 concavity = hacd::HaF32(0.0f);
-
 		if ( jobSwarmContext )
 		{
-			hacd::vector< TriangleConcavityJob *> jobs;
 			const dgBigVector* const points = (dgBigVector*) mesh.GetVertexPool();
 			for (dgList<dgHACDClusterFace>::dgListNode* node = cluster.GetFirst(); node; node = node->GetNext()) 
 			{
@@ -3826,26 +3821,10 @@ class dgHACDClusterGraph
 				for (dgEdge* ptr = edge->m_next->m_next; ptr != edge; ptr = ptr->m_next) 
 				{
 					hacd::HaI32 i2 = ptr->m_incidentVertex;
-					TriangleConcavityJob *job = HACD_NEW(TriangleConcavityJob)(&hull,clusterFace.m_normal,i0,i1,i2,points);
+					TriangleConcavityJob job(&hull,clusterFace.m_normal,i0,i1,i2,points);
 					jobs.push_back(job);
-					job->startJob(jobSwarmContext);
 					i1 = i2;
 				}
-			}
-
-			while ( TriangleConcavityJob::getJobCount() != 0 )
-			{
-				jobSwarmContext->processSwarmJobs();
-			}
-
-			for (hacd::HaU32 i=0; i<jobs.size(); i++)
-			{
-				TriangleConcavityJob *job = jobs[i];
-				if ( job->mConcvavity > concavity )
-				{
-					concavity = job->mConcvavity;
-				}
-				delete job;
 			}
 		}
 		else
@@ -3875,8 +3854,54 @@ class dgHACDClusterGraph
 
 	hacd::HaF64 CalculateConcavitySingleThread (dgHACDConveHull& hull, dgMeshEffect& mesh, dgHACDCluster& clusterA, dgHACDCluster& clusterB,JOB_SWARM::JobSwarmContext *jobSwarmContext)
 	{
-		hacd::HaF64 c1 = CalculateConcavity(hull, mesh, clusterA, jobSwarmContext);
-		hacd::HaF64 c2 = CalculateConcavity(hull, mesh, clusterB, jobSwarmContext);
+		hacd::HaF64 c1=0;
+		hacd::HaF64 c2=0;
+
+		// gather all of the work to be done to compute the concavity for both clusters in parallel
+		hacd::vector< TriangleConcavityJob > jobs1;
+		hacd::vector< TriangleConcavityJob > jobs2;
+
+		CalculateConcavity(hull, mesh, clusterA, jobSwarmContext,jobs1,c1);
+		CalculateConcavity(hull, mesh, clusterB, jobSwarmContext,jobs2,c2);
+
+		// if we have a micro-threading job system then...
+		if ( jobSwarmContext )
+		{
+			// start all of the jobs
+			for (hacd::HaU32 i=0; i<jobs1.size(); i++)
+			{
+				TriangleConcavityJob &job = jobs1[i];
+				job.startJob(jobSwarmContext);
+			}
+			for (hacd::HaU32 i=0; i<jobs2.size(); i++)
+			{
+				TriangleConcavityJob &job = jobs2[i];
+				job.startJob(jobSwarmContext);
+			}
+			// wait until all jobs have completed
+			while ( TriangleConcavityJob::getJobCount() != 0 )
+			{
+				jobSwarmContext->processSwarmJobs();
+			}
+			// gather concavity for cluster a
+			for (hacd::HaU32 i=0; i<jobs1.size(); i++)
+			{
+				TriangleConcavityJob &job = jobs1[i];
+				if ( job.mConcvavity > c1 )
+				{
+					c1 = job.mConcvavity;
+				}
+			}
+			// gather the concavity for cluster B
+			for (hacd::HaU32 i=0; i<jobs2.size(); i++)
+			{
+				TriangleConcavityJob &job = jobs2[i];
+				if ( job.mConcvavity > c1 )
+				{
+					c1 = job.mConcvavity;
+				}
+			}
+		}
 		return GetMax(c1,c2);
 	}
 
@@ -3902,6 +3927,7 @@ class dgHACDClusterGraph
 		}
 
 		dgList<dgPairProxy>::dgListNode* pairNode = NULL;
+
 		if (!flatStrip) 
 		{
 			m_vertexMark ++;
@@ -3926,7 +3952,8 @@ class dgHACDClusterGraph
 					concavity = CalculateConcavitySingleThread (convexHull, mesh, clusterA, clusterB, jobSwarmContext );
 				}
 
-				if (concavity < hacd::HaF64(1.0e-3f)) {
+				if (concavity < hacd::HaF64(1.0e-3f)) 
+				{
 					concavity = hacd::HaF64(0.0f);
 				}
 
@@ -3960,7 +3987,8 @@ class dgHACDClusterGraph
 
 		
 		HACD_ASSERT((pair.m_nodeA && pair.m_nodeB) || (!pair.m_nodeA && !pair.m_nodeB));
-		if (pair.m_nodeA && pair.m_nodeB) {
+		if (pair.m_nodeA && pair.m_nodeB) 
+		{
 			// call the progress callback
 			ReportProgress();
 
