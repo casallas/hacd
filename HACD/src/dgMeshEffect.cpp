@@ -3859,12 +3859,7 @@ class dgHACDClusterGraph
 
 		// gather all of the work to be done to compute the concavity for both clusters in parallel
 		hacd::vector< TriangleConcavityJob > jobs1;
-		hacd::vector< TriangleConcavityJob > jobs2;
-
 		CalculateConcavity(hull, mesh, clusterA, jobSwarmContext,jobs1,c1);
-		CalculateConcavity(hull, mesh, clusterB, jobSwarmContext,jobs2,c2);
-
-		// if we have a micro-threading job system then...
 		if ( jobSwarmContext )
 		{
 			// start all of the jobs
@@ -3873,6 +3868,13 @@ class dgHACDClusterGraph
 				TriangleConcavityJob &job = jobs1[i];
 				job.startJob(jobSwarmContext);
 			}
+			jobSwarmContext->processSwarmJobs();
+		}
+		hacd::vector< TriangleConcavityJob > jobs2;
+		CalculateConcavity(hull, mesh, clusterB, jobSwarmContext,jobs2,c2);
+		// if we have a micro-threading job system then...
+		if ( jobSwarmContext )
+		{
 			jobSwarmContext->processSwarmJobs();
 			for (hacd::HaU32 i=0; i<jobs2.size(); i++)
 			{
