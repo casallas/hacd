@@ -545,7 +545,7 @@ public:
 		hacd::HaU32 dtime = dgSystemTime()-mStartTime;
 		if ( dtime >= 1000 )
 		{
-			printf("\r\n[TIMEIT] %s took %d seconds and %d milliseconds.\r\n", mMessage, dtime/1000, dtime%100 );
+			printf("\r\n[TIMEIT] %s took %d seconds and %d milliseconds.\r\n", mMessage, dtime/1000, dtime%1000 );
 		}
 		else
 		{

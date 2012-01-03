@@ -55,6 +55,9 @@ public:
 	virtual hacd::HaU32	performHACD(const Desc &desc) 
 	{
 		hacd::HaU32 ret = 0;
+
+		TIMEIT("PerformHACD");
+
 		releaseHACD();
 		
 		if ( desc.mVertexCount )
