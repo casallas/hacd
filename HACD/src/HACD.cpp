@@ -43,6 +43,24 @@ namespace HACD
 class MyHACD_API : public HACD_API, public UANS::UserAllocated
 {
 public:
+	class Vec3
+	{
+	public:
+		Vec3(void)
+		{
+
+		}
+		Vec3(HaF32 _x,HaF32 _y,HaF32 _z)
+		{
+			x = _x;
+			y = _y;
+			z = _z;
+		}
+		HaF32 x;
+		HaF32 y;
+		HaF32 z;
+	};
+
 	MyHACD_API(void)
 	{
 		
@@ -52,16 +70,109 @@ public:
 		releaseHACD();
 	}
 
-	virtual hacd::HaU32	performHACD(const Desc &desc) 
+	void normalizeInputMesh(Desc &desc,Vec3 &inputScale,Vec3 &inputCenter)
+	{
+		const HaF32 *source = desc.mVertices;
+
+		Vec3 bmin,bmax;
+
+		for (HaU32 i=0; i<desc.mVertexCount; i++)
+		{
+			const Vec3 &v = *(const Vec3 *)source;
+			if ( i == 0 )
+			{
+				bmin = v;
+				bmax = v;
+			}
+			else
+			{
+				if ( v.x < bmin.x ) bmin.x = v.x;
+				if ( v.y < bmin.y ) bmin.y = v.y;
+				if ( v.z < bmin.z ) bmin.z = v.z;
+
+				if ( v.x > bmax.x ) bmax.x = v.x;
+				if ( v.y > bmax.x ) bmax.y = v.y;
+				if ( v.z > bmax.x ) bmax.z = v.z;
+
+			}
+			source+=3;
+		}
+		inputCenter.x = (bmin.x+bmax.x)*0.5f;
+		inputCenter.y = (bmin.y+bmax.y)*0.5f;
+		inputCenter.z = (bmin.z+bmax.z)*0.5f;
+
+		HaF32 dx = bmax.x - bmin.x;
+		HaF32 dy = bmax.y - bmin.y;
+		HaF32 dz = bmax.z - bmin.z;
+
+		if ( dx > 0 )
+		{
+			inputScale.x = 1.0f / dx;
+		}
+		else
+		{
+			inputScale.x = 1;
+		}
+
+		if ( dy > 0 )
+		{
+			inputScale.y = 1.0f / dy;
+		}
+		else
+		{
+			inputScale.y = 1;
+		}
+
+		if ( dz > 0 )
+		{
+			inputScale.z = 1.0f / dz;
+		}
+		else
+		{
+			inputScale.z = 1;
+		}
+
+		source = desc.mVertices;
+		desc.mVertices = (const HaF32 *)HACD_ALLOC( sizeof(HaF32)*3*desc.mVertexCount );
+		HaF32 *dest = (HaF32 *)desc.mVertices;
+		for (HaU32 i=0; i<desc.mVertexCount; i++)
+		{
+			dest[0] = (source[0]-inputCenter.x)*inputScale.x;
+			dest[1] = (source[1]-inputCenter.y)*inputScale.y;
+			dest[2] = (source[2]-inputCenter.z)*inputScale.z;
+			dest+=3;
+			source+=3;
+		}
+		inputScale.x = dx;
+		inputScale.y = dy;
+		inputScale.z = dz;
+	}
+
+	void releaseNormalizedInputMesh(Desc &desc)
+	{
+		HACD_FREE( (void *)desc.mVertices );
+	}
+
+	virtual hacd::HaU32	performHACD(const Desc &_desc) 
 	{
 		hacd::HaU32 ret = 0;
 
 		TIMEIT("PerformHACD");
 
 		releaseHACD();
+		Desc desc = _desc;
 		
 		if ( desc.mVertexCount )
 		{
+
+			Vec3 inputScale(1,1,1);
+			Vec3 inputCenter(0,0,0);
+
+			if ( desc.mNormalizeInputMesh )
+			{
+				normalizeInputMesh(desc,inputScale,inputCenter);
+			}
+
 			{
 				dgMeshEffect mesh(true);
 
@@ -111,9 +222,9 @@ public:
 								{
 									hacd::HaF32 *dest = (hacd::HaF32 *)&h.mVertices[i*3];
 									const dgBigVector &source = hull->GetVertex(i);
-									dest[0] = (hacd::HaF32)source.m_x;
-									dest[1] = (hacd::HaF32)source.m_y;
-									dest[2] = (hacd::HaF32)source.m_z;
+									dest[0] = (hacd::HaF32)source.m_x*inputScale.x+inputCenter.x;
+									dest[1] = (hacd::HaF32)source.m_y*inputScale.y+inputCenter.y;
+									dest[2] = (hacd::HaF32)source.m_z*inputScale.z+inputCenter.z;
 								}
 
 								h.mTriangleCount = hull->GetCount();
@@ -154,6 +265,11 @@ public:
 					delete result;
 				}
 				ret= (HaU32)mHulls.size();
+			}
+
+			if ( desc.mNormalizeInputMesh )
+			{
+				releaseNormalizedInputMesh(desc);
 			}
 		}
 

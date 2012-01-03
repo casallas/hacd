@@ -52,6 +52,7 @@ public:
 			init();
 		}
 
+		bool				mNormalizeInputMesh;
 		hacd::HaU32			mTriangleCount;
 		hacd::HaU32			mVertexCount;
 		const hacd::HaF32	*mVertices;
@@ -66,6 +67,7 @@ public:
 		hacd::ICallback*	mCallback;
 		void init(void)
 		{
+			mNormalizeInputMesh = true;
 			mJobSwarmContext = NULL;
 			mTriangleCount = 0;
 			mVertexCount = 0;

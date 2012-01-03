@@ -132,6 +132,8 @@ void main(int argc,const char ** argv)
 		const char *wavefront = argv[1];
 		int scan = 2;
 		int threadCount = 0;
+
+
 		while ( scan < argc )
 		{
 			const char *option = argv[scan];
@@ -199,12 +201,26 @@ void main(int argc,const char ** argv)
 			{
 				printf("Performing HACD on %d input triangles.\r\n", desc.mTriangleCount );
 				printf("\r\n");
-				printf("Concavity               : %0.2f\r\n", desc.mConcavity );
-				printf("Max Hull Vertex Count   : %3d\r\n", desc.mMaxHullVertices );
-				printf("Max Convex Hulls        : %3d\r\n", desc.mMaxHullCount );
-				printf("Max Merged Convex Hulls : %3d\r\n", desc.mMaxMergeHullCount );
-				printf("Merge Threshold         : %0.2f\r\n", desc.mSmallClusterThreshold);
+				printf("TriangleCount            : %d\r\n", desc.mTriangleCount );
+				printf("VertexCount              : %d\r\n", desc.mVertexCount );
+				printf("Concavity                : %0.2f\r\n", desc.mConcavity );
+				printf("Max Hull Vertex Count    : %3d\r\n", desc.mMaxHullVertices );
+				printf("Max Convex Hulls         : %3d\r\n", desc.mMaxHullCount );
+				printf("Max Merged Convex Hulls  : %3d\r\n", desc.mMaxMergeHullCount );
+				printf("Merge Threshold          : %0.2f\r\n", desc.mSmallClusterThreshold);
 				printf("Back Face Distance Factor: %0.2f\r\n", desc.mBackFaceDistanceFactor );
+				printf("Small Cluster Threshold  : %0.2f\r\n", desc.mSmallClusterThreshold );
+
+				if ( jobSwarmContext )
+				{
+					printf("Parallel Solver TheadCount: %d\r\n", threadCount );
+				}
+
+				if ( desc.mNormalizeInputMesh )
+				{
+					printf("Normalizing input mesh.\r\n");
+				}
+
 				printf("\r\n");
 
 				desc.mJobSwarmContext = jobSwarmContext;
