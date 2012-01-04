@@ -6,6 +6,7 @@
 #include "dgMeshEffect.h"
 #include "dgConvexHull3d.h"
 #include "MergeHulls.h"
+#include "ConvexDecomposition.h"
 
 /*!
 **
@@ -170,126 +171,157 @@ public:
 		if ( desc.mVertexCount )
 		{
 
-			Vec3 inputScale(1,1,1);
-			Vec3 inputCenter(0,0,0);
-
-			if ( desc.mNormalizeInputMesh )
+			if ( desc.mDecompositionDepth ) // if using legacy ACD
 			{
-				if ( _desc.mCallback )
+				CONVEX_DECOMPOSITION::ConvexDecomposition *cd = CONVEX_DECOMPOSITION::createConvexDecomposition();
+
+				CONVEX_DECOMPOSITION::DecompDesc dcompDesc;
+
+				dcompDesc.mIndices		= desc.mIndices;
+				dcompDesc.mVertices		= desc.mVertices;
+				dcompDesc.mTcount		= desc.mTriangleCount;
+				dcompDesc.mVcount		= desc.mVertexCount;
+				dcompDesc.mMaxVertices	= desc.mMaxHullVertices;
+				dcompDesc.mDepth		= desc.mDecompositionDepth;
+				dcompDesc.mCpercent		= desc.mConcavity;
+				dcompDesc.mMeshVolumePercent = 0.001f;
+
+				ret = cd->performConvexDecomposition(dcompDesc);
+
+				for (hacd::HaU32 i=0; i<ret; i++)
 				{
-					_desc.mCallback->ReportProgress("Normalizing Input Mesh",1);
+					CONVEX_DECOMPOSITION::ConvexResult *result =cd->getConvexResult(i,true);
+					Hull h;
+					h.mVertices = result->mHullVertices;
+					h.mIndices  = result->mHullIndices;
+					h.mTriangleCount = result->mHullTcount;
+					h.mVertexCount = result->mHullVcount;
+					mHulls.push_back(h);
 				}
-				normalizeInputMesh(desc,inputScale,inputCenter);
 			}
-
+			else
 			{
-				dgMeshEffect mesh(true);
+				Vec3 inputScale(1,1,1);
+				Vec3 inputCenter(0,0,0);
 
-				float normal[3] = { 0,1,0 };
-				float uv[2] = { 0,0 };
-
-				hacd::HaI32 *faceIndexCount = (hacd::HaI32 *)HACD_ALLOC(sizeof(hacd::HaI32)*desc.mTriangleCount);
-				hacd::HaI32 *dummyIndex = (hacd::HaI32 *)HACD_ALLOC(sizeof(hacd::HaI32)*desc.mTriangleCount*3);
-
-				for (hacd::HaU32 i=0; i<desc.mTriangleCount; i++)
+				if ( desc.mNormalizeInputMesh )
 				{
-					faceIndexCount[i] = 3;
-					dummyIndex[i*3+0] = 0;
-					dummyIndex[i*3+1] = 0;
-					dummyIndex[i*3+2] = 0;
-				}
-
-				if ( _desc.mCallback )
-				{
-					_desc.mCallback->ReportProgress("Building Mesh from Vertex Index List",1);
-				}
-				mesh.BuildFromVertexListIndexList(desc.mTriangleCount,faceIndexCount,dummyIndex,
-					desc.mVertices,sizeof(hacd::HaF32)*3,(const hacd::HaI32 *const)desc.mIndices,
-					normal,sizeof(hacd::HaF32)*3,dummyIndex,
-					uv,sizeof(hacd::HaF32)*2,dummyIndex,
-					uv,sizeof(hacd::HaF32)*2,dummyIndex);
-
-				dgMeshEffect *result;
-				{
-					TIMEIT("ConvexApproximation");
 					if ( _desc.mCallback )
 					{
-						_desc.mCallback->ReportProgress("Begin HACD",1);
+						_desc.mCallback->ReportProgress("Normalizing Input Mesh",1);
 					}
-					result = mesh.CreateConvexApproximation(desc.mConcavity,desc.mBackFaceDistanceFactor,desc.mMaxHullCount,desc.mMaxHullVertices,desc.mJobSwarmContext, desc.mCallback);
+					normalizeInputMesh(desc,inputScale,inputCenter);
 				}
 
-				if ( result )
 				{
-					// now we build hulls for each connected surface...
+					dgMeshEffect mesh(true);
+
+					float normal[3] = { 0,1,0 };
+					float uv[2] = { 0,0 };
+
+					hacd::HaI32 *faceIndexCount = (hacd::HaI32 *)HACD_ALLOC(sizeof(hacd::HaI32)*desc.mTriangleCount);
+					hacd::HaI32 *dummyIndex = (hacd::HaI32 *)HACD_ALLOC(sizeof(hacd::HaI32)*desc.mTriangleCount*3);
+
+					for (hacd::HaU32 i=0; i<desc.mTriangleCount; i++)
+					{
+						faceIndexCount[i] = 3;
+						dummyIndex[i*3+0] = 0;
+						dummyIndex[i*3+1] = 0;
+						dummyIndex[i*3+2] = 0;
+					}
+
 					if ( _desc.mCallback )
 					{
-						_desc.mCallback->ReportProgress("Getting connected surfaces",1);
+						_desc.mCallback->ReportProgress("Building Mesh from Vertex Index List",1);
 					}
-					dgPolyhedra segment;
-					result->BeginConectedSurface();
+					mesh.BuildFromVertexListIndexList(desc.mTriangleCount,faceIndexCount,dummyIndex,
+						desc.mVertices,sizeof(hacd::HaF32)*3,(const hacd::HaI32 *const)desc.mIndices,
+						normal,sizeof(hacd::HaF32)*3,dummyIndex,
+						uv,sizeof(hacd::HaF32)*2,dummyIndex,
+						uv,sizeof(hacd::HaF32)*2,dummyIndex);
 
-					if ( result->GetConectedSurface(segment))
+					dgMeshEffect *result;
 					{
-						dgMeshEffect *solid = HACD_NEW(dgMeshEffect)(segment,*result);
-						while ( solid )
+						TIMEIT("ConvexApproximation");
+						if ( _desc.mCallback )
 						{
-							dgConvexHull3d *hull = solid->CreateConvexHull(0.00001,desc.mMaxHullVertices);
-							if ( hull )
+							_desc.mCallback->ReportProgress("Begin HACD",1);
+						}
+						result = mesh.CreateConvexApproximation(desc.mConcavity,desc.mBackFaceDistanceFactor,desc.mMaxHullCount,desc.mMaxHullVertices,desc.mJobSwarmContext, desc.mCallback);
+					}
+
+					if ( result )
+					{
+						// now we build hulls for each connected surface...
+						if ( _desc.mCallback )
+						{
+							_desc.mCallback->ReportProgress("Getting connected surfaces",1);
+						}
+						dgPolyhedra segment;
+						result->BeginConectedSurface();
+
+						if ( result->GetConectedSurface(segment))
+						{
+							dgMeshEffect *solid = HACD_NEW(dgMeshEffect)(segment,*result);
+							while ( solid )
 							{
-								Hull h;
-								h.mVertexCount = hull->GetVertexCount();
-								h.mVertices = (hacd::HaF32 *)HACD_ALLOC( sizeof(hacd::HaF32)*3*h.mVertexCount);
-								for (hacd::HaU32 i=0; i<h.mVertexCount; i++)
+								dgConvexHull3d *hull = solid->CreateConvexHull(0.00001,desc.mMaxHullVertices);
+								if ( hull )
 								{
-									hacd::HaF32 *dest = (hacd::HaF32 *)&h.mVertices[i*3];
-									const dgBigVector &source = hull->GetVertex(i);
-									dest[0] = (hacd::HaF32)source.m_x*inputScale.x+inputCenter.x;
-									dest[1] = (hacd::HaF32)source.m_y*inputScale.y+inputCenter.y;
-									dest[2] = (hacd::HaF32)source.m_z*inputScale.z+inputCenter.z;
+									Hull h;
+									h.mVertexCount = hull->GetVertexCount();
+									h.mVertices = (hacd::HaF32 *)HACD_ALLOC( sizeof(hacd::HaF32)*3*h.mVertexCount);
+									for (hacd::HaU32 i=0; i<h.mVertexCount; i++)
+									{
+										hacd::HaF32 *dest = (hacd::HaF32 *)&h.mVertices[i*3];
+										const dgBigVector &source = hull->GetVertex(i);
+										dest[0] = (hacd::HaF32)source.m_x*inputScale.x+inputCenter.x;
+										dest[1] = (hacd::HaF32)source.m_y*inputScale.y+inputCenter.y;
+										dest[2] = (hacd::HaF32)source.m_z*inputScale.z+inputCenter.z;
+									}
+
+									h.mTriangleCount = hull->GetCount();
+									hacd::HaU32 *destIndices = (hacd::HaU32 *)HACD_ALLOC(sizeof(hacd::HaU32)*3*h.mTriangleCount);
+									h.mIndices = destIndices;
+				
+									dgList<dgConvexHull3DFace>::Iterator iter(*hull);
+									for (iter.Begin(); iter; iter++)
+									{
+										dgConvexHull3DFace &face = (*iter);
+										destIndices[0] = face.m_index[0];
+										destIndices[1] = face.m_index[1];
+										destIndices[2] = face.m_index[2];
+										destIndices+=3;
+									}
+
+									mHulls.push_back(h);
+
+									// save it!
+									delete hull;
 								}
 
-								h.mTriangleCount = hull->GetCount();
-								hacd::HaU32 *destIndices = (hacd::HaU32 *)HACD_ALLOC(sizeof(hacd::HaU32)*3*h.mTriangleCount);
-								h.mIndices = destIndices;
-			
-								dgList<dgConvexHull3DFace>::Iterator iter(*hull);
-								for (iter.Begin(); iter; iter++)
+								delete solid;
+								solid = NULL;
+								dgPolyhedra nextSegment;
+								hacd::HaI32 moreSegments = result->GetConectedSurface(nextSegment);
+								if ( moreSegments )
 								{
-									dgConvexHull3DFace &face = (*iter);
-									destIndices[0] = face.m_index[0];
-									destIndices[1] = face.m_index[1];
-									destIndices[2] = face.m_index[2];
-									destIndices+=3;
+									solid = HACD_NEW(dgMeshEffect)(nextSegment,*result);
 								}
-
-								mHulls.push_back(h);
-
-								// save it!
-								delete hull;
-							}
-
-							delete solid;
-							solid = NULL;
-							dgPolyhedra nextSegment;
-							hacd::HaI32 moreSegments = result->GetConectedSurface(nextSegment);
-							if ( moreSegments )
-							{
-								solid = HACD_NEW(dgMeshEffect)(nextSegment,*result);
-							}
-							else
-							{
-								result->EndConectedSurface();
+								else
+								{
+									result->EndConectedSurface();
+								}
 							}
 						}
-					}
 
-					delete result;
+						delete result;
+					}
 				}
 				ret= (HaU32)mHulls.size();
 			}
 
-			if ( desc.mNormalizeInputMesh )
+			if ( desc.mNormalizeInputMesh && desc.mDecompositionDepth == 0 )
 			{
 				releaseNormalizedInputMesh(desc);
 			}

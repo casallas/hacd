@@ -122,6 +122,7 @@ void main(int argc,const char ** argv)
 		printf("-c <concavity> : Between 0 and 1 are good ranges to try; default is 0.2.  The smaller the number, the more convex hulls are produced.\r\n");
 		printf("-b <backFaceDistanceFactor : The back face distance factor, default is 0.01; set to larger values for hollow objects.\r\n");
 		printf("-t <threadCount> : Specifies the number of threads to use for a multi-threaded implementation\r\n");
+		printf("-d <decompositionDepth> : Specifies the decomposition depth; uses legacy ACD instead of HACD\r\n");
 		printf("\r\n");
 		printf("Example: TestHACD hornbug.obj -m 40 -v 64\r\n");
 		printf("\r\n");
@@ -145,6 +146,11 @@ void main(int argc,const char ** argv)
 			else if ( strcmp(option,"-t") == 0 )
 			{
 				threadCount  = getIntArg(scan+1,argc,argv);
+				scan+=2;
+			}
+			else if ( strcmp(option,"-d") == 0 )
+			{
+				desc.mDecompositionDepth  = getIntArg(scan+1,argc,argv);
 				scan+=2;
 			}
 			else if ( strcmp(option,"-b") == 0 )
@@ -210,6 +216,10 @@ void main(int argc,const char ** argv)
 				printf("Merge Threshold          : %0.2f\r\n", desc.mSmallClusterThreshold);
 				printf("Back Face Distance Factor: %0.2f\r\n", desc.mBackFaceDistanceFactor );
 				printf("Small Cluster Threshold  : %0.2f\r\n", desc.mSmallClusterThreshold );
+				if ( desc.mDecompositionDepth )
+				{
+					printf("DecompositionDepth       : %d\r\n", desc.mDecompositionDepth );
+				}
 
 				if ( jobSwarmContext )
 				{

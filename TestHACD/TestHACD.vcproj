@@ -200,6 +200,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\HACD\src\ConvexDecomposition.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\HACD\src\ConvexHull.cpp"
 					>
 				</File>
@@ -273,6 +277,10 @@
 				>
 				<File
 					RelativePath="..\HACD\include\AutoGeometry.h"
+					>
+				</File>
+				<File
+					RelativePath="..\HACD\include\ConvexDecomposition.h"
 					>
 				</File>
 				<File

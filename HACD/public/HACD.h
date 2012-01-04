@@ -63,10 +63,12 @@ public:
 		hacd::HaF32			mConcavity;
 		hacd::HaF32			mSmallClusterThreshold;
 		hacd::HaF32			mBackFaceDistanceFactor;
+		hacd::HaU32			mDecompositionDepth; // if using legacy ACD algorithm.
 		JOB_SWARM::JobSwarmContext	*mJobSwarmContext;
 		hacd::ICallback*	mCallback;
 		void init(void)
 		{
+			mDecompositionDepth = 0;
 			mNormalizeInputMesh = true;
 			mJobSwarmContext = NULL;
 			mTriangleCount = 0;
