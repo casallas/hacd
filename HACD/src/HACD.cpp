@@ -157,6 +157,11 @@ public:
 	{
 		hacd::HaU32 ret = 0;
 
+		if ( _desc.mCallback )
+		{
+			_desc.mCallback->ReportProgress("Starting HACD",1);
+		}
+
 		TIMEIT("PerformHACD");
 
 		releaseHACD();
@@ -170,6 +175,10 @@ public:
 
 			if ( desc.mNormalizeInputMesh )
 			{
+				if ( _desc.mCallback )
+				{
+					_desc.mCallback->ReportProgress("Normalizing Input Mesh",1);
+				}
 				normalizeInputMesh(desc,inputScale,inputCenter);
 			}
 
@@ -190,6 +199,10 @@ public:
 					dummyIndex[i*3+2] = 0;
 				}
 
+				if ( _desc.mCallback )
+				{
+					_desc.mCallback->ReportProgress("Building Mesh from Vertex Index List",1);
+				}
 				mesh.BuildFromVertexListIndexList(desc.mTriangleCount,faceIndexCount,dummyIndex,
 					desc.mVertices,sizeof(hacd::HaF32)*3,(const hacd::HaI32 *const)desc.mIndices,
 					normal,sizeof(hacd::HaF32)*3,dummyIndex,
@@ -199,14 +212,23 @@ public:
 				dgMeshEffect *result;
 				{
 					TIMEIT("ConvexApproximation");
+					if ( _desc.mCallback )
+					{
+						_desc.mCallback->ReportProgress("Begin HACD",1);
+					}
 					result = mesh.CreateConvexApproximation(desc.mConcavity,desc.mBackFaceDistanceFactor,desc.mMaxHullCount,desc.mMaxHullVertices,desc.mJobSwarmContext, desc.mCallback);
 				}
 
 				if ( result )
 				{
 					// now we build hulls for each connected surface...
+					if ( _desc.mCallback )
+					{
+						_desc.mCallback->ReportProgress("Getting connected surfaces",1);
+					}
 					dgPolyhedra segment;
 					result->BeginConectedSurface();
+
 					if ( result->GetConectedSurface(segment))
 					{
 						dgMeshEffect *solid = HACD_NEW(dgMeshEffect)(segment,*result);
@@ -279,6 +301,10 @@ public:
 			MergeHullsInterface *mhi = createMergeHullsInterface();
 			if ( mhi )
 			{
+				if ( _desc.mCallback )
+				{
+					_desc.mCallback->ReportProgress("Gathering Input Hulls",1);
+				}
 				MergeHullVector inputHulls;
 				MergeHullVector outputHulls;
 				for (hacd::HaU32 i=0; i<ret; i++)
@@ -304,6 +330,10 @@ public:
 				}
 				mHulls.clear();
 
+				if ( _desc.mCallback )
+				{
+					_desc.mCallback->ReportProgress("Gathering Merged Hulls",1);
+				}
 				for (hacd::HaU32 i=0; i<outputHulls.size(); i++)
 				{
 					Hull h;

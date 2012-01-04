@@ -27,6 +27,7 @@
 #include "dgAABBPolygonSoup.h"
 #include "dgPolygonSoupBuilder.h"
 #include "JobSwarm.h"
+#include "SparseArray.h"
 
 #include <string.h>
 
@@ -3758,7 +3759,7 @@ class dgHACDClusterGraph
 			mI3			= i3;
 		}
 
-		~TriangleConcavityJob(void)
+		virtual ~TriangleConcavityJob(void)
 		{
 		}
 #pragma warning(push)
@@ -4216,29 +4217,62 @@ dgMeshEffect* dgMeshEffect::CreateConvexApproximation(
 	hacd::ICallback* reportProgressCallback) const
 {
 	//	dgMeshEffect triangleMesh(*this);
-	if (maxHullsCount <= 1) {
+	if (maxHullsCount <= 1) 
+	{
 		maxHullsCount = 1;
 	}
-	if (maxConcavity <= hacd::HaF32 (1.0e-5f)) {
+	if (maxConcavity <= hacd::HaF32 (1.0e-5f)) 
+	{
 		maxConcavity = hacd::HaF32 (1.0e-5f);
 	}
 
-	if (maxVertexPerHull < 4) {
+	if (maxVertexPerHull < 4) 
+	{
 		maxVertexPerHull = 4;
 	}
 	ClampValue(backFaceDistanceFactor, hacd::HaF32 (0.01f), hacd::HaF32 (1.0f));
+
+	if ( reportProgressCallback )
+	{
+		reportProgressCallback->ReportProgress("Making a copy of the input mesh",0);
+	}
 	// make a copy of the mesh
 	dgMeshEffect mesh(*this);
 	mesh.ClearAttributeArray();
 
 	// create a general connectivity graph    
+	if ( reportProgressCallback )
+	{
+		reportProgressCallback->ReportProgress("Creating Connectivity Graph",0);
+	}
+	// make a copy of the mesh
 	dgHACDClusterGraph graph (mesh, backFaceDistanceFactor, reportProgressCallback);
+
+	if ( reportProgressCallback )
+	{
+		reportProgressCallback->ReportProgress("Submit Initial Edge Costs",0);
+	}
 
 	// calculate initial edge costs
 	graph.SubmitInitialEdgeCosts(mesh,jobSwarmContext);
 
 	// collapse the graph
+	if ( reportProgressCallback )
+	{
+		reportProgressCallback->ReportProgress("Collapse the Graph",0);
+	}
+
+	if ( reportProgressCallback )
+	{
+		reportProgressCallback->ReportProgress("Collapse Clusters",0);
+	}
+
 	graph.CollapseClusters (mesh, maxConcavity, maxHullsCount, jobSwarmContext);
+
+	if ( reportProgressCallback )
+	{
+		reportProgressCallback->ReportProgress("Creating Partition Mesh",0);
+	}
 
 	// Create Partition Mesh
 	return graph.CreatePatitionMesh (mesh, maxVertexPerHull);

@@ -526,7 +526,7 @@ HACD_INLINE hacd::HaF32 dgCeil(hacd::HaF32 x)
 #define dgPow(x,y) hacd::HaF32 (pow(x,y))
 #define dgFmod(x,y) hacd::HaF32 (fmod(x,y))
 
-#define USE_TIMEIT 1
+#define USE_TIMEIT 0
 
 #if USE_TIMEIT
 

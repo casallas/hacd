@@ -43,7 +43,7 @@ template < class Value,	size_t hashTableSize = 512 >		// *MUST* be a power of 2!
 class SparseArray : public UANS::UserAllocated
 {
 public:
-	SparseArray(HaU32 maxEntries)
+	SparseArray(HaSizeT maxEntries)
 	{
 		mFreeList = NULL;
 		mHashTableCount = 0;
@@ -56,7 +56,7 @@ public:
 		delete []mEntries;
 	}
 
-	Value& operator[] (HaU32 key)
+	Value& operator[] (HaSizeT key)
 	{
 		Value *v = find(key);
 		if ( v == NULL )
@@ -69,7 +69,7 @@ public:
 		return *v;
 	}
 
-	const Value& operator[](HaU32 key) const
+	const Value& operator[](HaSizeT key) const
 	{
 		Value *v = find(key);
 		if ( v == NULL )
@@ -83,10 +83,10 @@ public:
 	}
 
 
-	Value* find(HaU32 key)  const
+	Value* find(HaSizeT key)  const
 	{
 		Value* ret = NULL;
-		HaU32 hash = getHash(key);
+		HaSizeT hash = getHash(key);
 		HashEntry* h = mHashTable[hash];
 		while (h)
 		{
@@ -100,9 +100,9 @@ public:
 		return ret;
 	}
 
-	void erase(HaU32 key)
+	void erase(HaSizeT key)
 	{
-		HaU32 hash = getHash(key);
+		HaSizeT hash = getHash(key);
 		HashEntry* h = mHashTable[hash];
 		HashEntry *prev = NULL;
 		while (h)
@@ -128,7 +128,7 @@ public:
 		}
 	}
 
-	void insert(HaU32 key, const Value& value)
+	void insert(HaSizeT key, const Value& value)
 	{
 		if (mHashTableCount < mMaxEntries )
 		{
@@ -148,7 +148,7 @@ public:
 
 			h->mKey = key;
 			h->mValue = value;
-			HaU32 hash = getHash(key);
+			HaSizeT hash = getHash(key);
 			if (mHashTable[hash])
 			{
 				HashEntry* next = mHashTable[hash];
@@ -183,6 +183,14 @@ private:
 		return ret & (hashTableSize - 1);
 	}
 
+	HACD_INLINE HaU64 getHash(HaU64 key) const
+	{
+		HaU32 *temp = (HaU32 *)&key;
+		temp[0] = hash( temp[0] );
+		temp[1] = hash( temp[1] );
+		return key & (hashTableSize - 1);
+	}
+
 	class HashEntry : public UANS::UserAllocated
 	{
 	public:
@@ -191,14 +199,14 @@ private:
 			mNext = NULL;
 		}
 		HashEntry*	mNext;
-		HaU32		mKey;
+		HaSizeT		mKey;
 		Value		mValue;
 	};
 
 	HashEntry*		mFreeList;
 	HashEntry*		mHashTable[hashTableSize];
 	unsigned int	mHashTableCount;
-	HaU32			mMaxEntries;
+	HaSizeT			mMaxEntries;
 	HashEntry		*mEntries;
 
 };
@@ -218,7 +226,7 @@ public:
 	{
 	}
 
-	Value& operator[] (HaU32 key)
+	Value& operator[] (HaSizeT key)
 	{
 		Value *v = find(key);
 		if ( v == NULL )
@@ -231,7 +239,7 @@ public:
 		return *v;
 	}
 
-	const Value& operator[](HaU32 key) const
+	const Value& operator[](HaSizeT key) const
 	{
 		Value *v = find(key);
 		if ( v == NULL )
@@ -245,10 +253,10 @@ public:
 	}
 
 
-	Value* find(HaU32 key)  const
+	Value* find(HaSizeT key)  const
 	{
 		Value* ret = NULL;
-		HaU32 hash = getHash(key);
+		HaSizeT hash = getHash(key);
 		HashEntry* h = mHashTable[hash];
 		while (h)
 		{
@@ -262,9 +270,9 @@ public:
 		return ret;
 	}
 
-	void erase(HaU32 key)
+	void erase(HaSizeT key)
 	{
-		HaU32 hash = getHash(key);
+		HaSizeT hash = getHash(key);
 		HashEntry* h = mHashTable[hash];
 		HashEntry *prev = NULL;
 		while (h)
@@ -290,7 +298,7 @@ public:
 		}
 	}
 
-	void insert(HaU32 key, const Value& value)
+	void insert(HaSizeT key, const Value& value)
 	{
 		if (mHashTableCount < maxEntries )
 		{
@@ -310,7 +318,7 @@ public:
 
 			h->mKey = key;
 			h->mValue = value;
-			HaU32 hash = getHash(key);
+			HaSizeT hash = getHash(key);
 			if (mHashTable[hash])
 			{
 				HashEntry* next = mHashTable[hash];
@@ -345,6 +353,14 @@ private:
 		return ret & (hashTableSize - 1);
 	}
 
+	HACD_INLINE HaU64 getHash(HaU64 key) const
+	{
+		HaU32 *temp = (HaU32 *)&key;
+		temp[0] = hash( temp[0] );
+		temp[1] = hash( temp[1] );
+		return key & (hashTableSize - 1);
+	}
+
 	class HashEntry : public UANS::UserAllocated
 	{
 	public:
@@ -353,7 +369,7 @@ private:
 			mNext = NULL;
 		}
 		HashEntry*	mNext;
-		HaU32		mKey;
+		HaSizeT		mKey;
 		Value		mValue;
 	};
 
