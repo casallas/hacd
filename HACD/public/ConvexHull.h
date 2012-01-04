@@ -63,7 +63,7 @@ public:
 		mNormalEpsilon  = 0.001f;
 		mMaxVertices = 256; // maximum number of points to be considered for a convex hull.
 		mSkinWidth = 0.0f; // default is one centimeter
-		mUseWuQuantizer = true;
+		mUseWuQuantizer = false;
 	};
 
 	HullDesc(hacd::HaU32 vcount,

@@ -1551,22 +1551,27 @@ void dgPolyhedra::MarkAdjacentCoplanarFaces (dgPolyhedra& polyhedraOut, dgEdge* 
 		hacd::HaI32 index = 1;
 		deleteCount = 0;
 		stack[0] = face;
-		while (index) {
+		while (index) 
+		{
 			index --;
 			dgEdge* const face = stack[index];
 			deleteEdge[deleteCount] = face;
 			deleteCount ++;
 			HACD_ASSERT (deleteCount < hacd::HaI32 (sizeof (deleteEdge) / sizeof (deleteEdge[0])));
-			HACD_ASSERT (face->m_next->m_next->m_next == face);
+// TODO:JWR Temporarily commented out...			HACD_ASSERT (face->m_next->m_next->m_next == face);
 
 			dgEdge* edge = face;
-			do {
+			do 
+			{
 				dgEdge* const ptr = edge->m_twin;
-				if (ptr->m_incidentFace > 0) {
-					if (ptr->m_mark != faceMark) {
+				if (ptr->m_incidentFace > 0) 
+				{
+					if (ptr->m_mark != faceMark) 
+					{
 						dgEdge* ptr1 = ptr;
 						faceIndexCount = 0;
-						do {
+						do 
+						{
 							ptr1->m_mark = faceMark;
 							faceIndex[faceIndexCount] = ptr1->m_incidentVertex;
 							HACD_ASSERT (faceIndexCount < hacd::HaI32 (sizeof (faceIndex) / sizeof (faceIndex[0])));
