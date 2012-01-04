@@ -38,77 +38,14 @@ public:
   ConvexDecompInterface *mCallback;
   hacd::HaF32			mMeshVolumePercent;
   hacd::HaF32			mMasterVolume;
-  hacd::HaF32			mMasterMeshVolume;
   hacd::HaU32			mMaxDepth;
   hacd::HaF32			mConcavePercent;
+  hacd::HaU32			mOutputCount;
+  hacd::HaU32			mOutputPow2;
+  hacd::ICallback		*mICallback;
 };
 
-template <class Type> class Vector3d
-{
-public:
-	Vector3d(void) { };  // null constructor, does not inialize point.
-
-	Vector3d(const Vector3d &a) // constructor copies existing vector.
-	{
-		x = a.x;
-		y = a.y;
-		z = a.z;
-	};
-
-	Vector3d(Type a,Type b,Type c) // construct with initial point.
-	{
-		x = a;
-		y = b;
-		z = c;
-	};
-
-	Vector3d(const hacd::HaF32 *t)
-	{
-		x = t[0];
-		y = t[1];
-		z = t[2];
-	};
-
-  void Set(const hacd::HaF32 *p)
-  {
-    x = (Type)p[0];
-    y = (Type)p[1];
-    z = (Type)p[2];
-  }
-
-
-
-	const Type* Ptr() const { return &x; }
-	Type* Ptr() { return &x; }
-
-
-	Type x;
-	Type y;
-	Type z;
-};
-
-
-
-#define WSCALE 4
-#define CONCAVE_THRESH 0.05f
-
-
-class Wpoint
-{
-public:
-  Wpoint(const Vector3d<hacd::HaF32> &p,hacd::HaF32 w)
-  {
-    mPoint = p;
-    mWeight = w;
-  }
-
-  Vector3d<hacd::HaF32> mPoint;
-  hacd::HaF32           mWeight;
-};
-
-typedef hacd::vector< Wpoint > WpointVector;
-
-hacd::HaF32 fm_computePlane(const hacd::HaF32 *A,const hacd::HaF32 *B,const hacd::HaF32 *C,hacd::HaF32 *n) // returns D
+static hacd::HaF32 fm_computePlane(const hacd::HaF32 *A,const hacd::HaF32 *B,const hacd::HaF32 *C,hacd::HaF32 *n) // returns D
 {
 	hacd::HaF32 vx = (B[0] - C[0]);
 	hacd::HaF32 vy = (B[1] - C[1]);
@@ -147,14 +84,14 @@ hacd::HaF32 fm_computePlane(const hacd::HaF32 *A,const hacd::HaF32 *B,const hacd
 	return D;
 }
 
-hacd::HaF32 fm_dot(const hacd::HaF32 *p1,const hacd::HaF32 *p2)
+static hacd::HaF32 fm_dot(const hacd::HaF32 *p1,const hacd::HaF32 *p2)
 {
 	return p1[0]*p2[0]+p1[1]*p2[1]+p1[2]*p2[2];
 }
 
 
 
-bool fm_samePlane(const hacd::HaF32 p1[4],const hacd::HaF32 p2[4],hacd::HaF32 normalEpsilon,hacd::HaF32 dEpsilon,bool doubleSided)
+static bool fm_samePlane(const hacd::HaF32 p1[4],const hacd::HaF32 p2[4],hacd::HaF32 normalEpsilon,hacd::HaF32 dEpsilon,bool doubleSided)
 {
 	bool ret = false;
 
@@ -174,7 +111,7 @@ bool fm_samePlane(const hacd::HaF32 p1[4],const hacd::HaF32 p2[4],hacd::HaF32 no
 	return ret;
 }
 
-bool    fm_isMeshCoplanar(hacd::HaU32 tcount,const hacd::HaU32 *indices,const hacd::HaF32 *vertices,bool doubleSided) // returns true if this collection of indexed triangles are co-planar!
+static bool    fm_isMeshCoplanar(hacd::HaU32 tcount,const hacd::HaU32 *indices,const hacd::HaF32 *vertices,bool doubleSided) // returns true if this collection of indexed triangles are co-planar!
 {
 	bool ret = true;
 
@@ -210,12 +147,12 @@ bool    fm_isMeshCoplanar(hacd::HaU32 tcount,const hacd::HaU32 *indices,const ha
 }
 
 
-hacd::HaF32 fm_distToPlane(const hacd::HaF32 *plane,const hacd::HaF32 *p) // computes the distance of this point from the plane.
+static hacd::HaF32 fm_distToPlane(const hacd::HaF32 *plane,const hacd::HaF32 *p) // computes the distance of this point from the plane.
 {
 	return p[0]*plane[0]+p[1]*plane[1]+p[2]*plane[2]+plane[3];
 }
 
-void fm_cross(hacd::HaF32 *cross,const hacd::HaF32 *a,const hacd::HaF32 *b)
+static void fm_cross(hacd::HaF32 *cross,const hacd::HaF32 *a,const hacd::HaF32 *b)
 {
 	cross[0] = a[1]*b[2] - a[2]*b[1];
 	cross[1] = a[2]*b[0] - a[0]*b[2];
@@ -241,48 +178,13 @@ void fm_cross(hacd::HaF32 *cross,const hacd::HaF32 *a,const hacd::HaF32 *b)
 	(a)[2] = (b)[0] * (c)[1] - (c)[0] * (b)[1];
 
 
-bool fm_rayIntersectsTriangle(const hacd::HaF32 *p,const hacd::HaF32 *d,const hacd::HaF32 *v0,const hacd::HaF32 *v1,const hacd::HaF32 *v2,hacd::HaF32 &t)
-{
-	hacd::HaF32 e1[3],e2[3],h[3],s[3],q[3];
-	hacd::HaF32 a,f,u,v;
-
-	vector(e1,v1,v0);
-	vector(e2,v2,v0);
-	crossProduct(h,d,e2);
-	a = innerProduct(e1,h);
-
-	if (a > -0.00001 && a < 0.00001)
-		return(false);
-
-	f = 1/a;
-	vector(s,p,v0);
-	u = f * (innerProduct(s,h));
-
-	if (u < 0.0 || u > 1.0)
-		return(false);
-
-	crossProduct(q,s,e1);
-	v = f * innerProduct(d,q);
-	if (v < 0.0 || u + v > 1.0)
-		return(false);
-	// at this stage we can compute t to find out where
-	// the intersection point is on the line
-	t = f * innerProduct(e2,q);
-	if (t > 0) // ray intersection
-		return(true);
-	else // this means that there is a line intersection
-		// but not a ray intersection
-		return (false);
-}
-
-
 inline hacd::HaF32 det(const hacd::HaF32 *p1,const hacd::HaF32 *p2,const hacd::HaF32 *p3)
 {
 	return  p1[0]*p2[1]*p3[2] + p2[0]*p3[1]*p1[2] + p3[0]*p1[1]*p2[2] -p1[0]*p3[1]*p2[2] - p2[0]*p1[1]*p3[2] - p3[0]*p2[1]*p1[2];
 }
 
 
-hacd::HaF32  fm_computeMeshVolume(const hacd::HaF32 *vertices,hacd::HaU32 tcount,const hacd::HaU32 *indices)
+static hacd::HaF32  fm_computeMeshVolume(const hacd::HaF32 *vertices,hacd::HaU32 tcount,const hacd::HaU32 *indices)
 {
 	hacd::HaF32 volume = 0;
 
@@ -302,45 +204,8 @@ hacd::HaF32  fm_computeMeshVolume(const hacd::HaF32 *vertices,hacd::HaU32 tcount
 
 
 
-bool fm_lineIntersectsTriangle(const hacd::HaF32 *rayStart,const hacd::HaF32 *rayEnd,const hacd::HaF32 *p1,const hacd::HaF32 *p2,const hacd::HaF32 *p3,hacd::HaF32 *sect)
-{
-	hacd::HaF32 dir[3];
-
-	dir[0] = rayEnd[0] - rayStart[0];
-	dir[1] = rayEnd[1] - rayStart[1];
-	dir[2] = rayEnd[2] - rayStart[2];
-
-	hacd::HaF32 d = (hacd::HaF32)::sqrt(dir[0]*dir[0] + dir[1]*dir[1] + dir[2]*dir[2]);
-	hacd::HaF32 r = 1.0f / d;
-
-	dir[0]*=r;
-	dir[1]*=r;
-	dir[2]*=r;
-
-
-	hacd::HaF32 t;
-
-	bool ret = fm_rayIntersectsTriangle(rayStart, dir, p1, p2, p3, t );
-
-	if ( ret )
-	{
-		if ( t > d )
-		{
-			sect[0] = rayStart[0] + dir[0]*t;
-			sect[1] = rayStart[1] + dir[1]*t;
-			sect[2] = rayStart[2] + dir[2]*t;
-		}
-		else
-		{
-			ret = false;
-		}
-	}
-
-	return ret;
-}
-
 // assumes that the points are on opposite sides of the plane!
-void fm_intersectPointPlane(const hacd::HaF32 *p1,const hacd::HaF32 *p2,hacd::HaF32 *split,const hacd::HaF32 *plane)
+static void fm_intersectPointPlane(const hacd::HaF32 *p1,const hacd::HaF32 *p2,hacd::HaF32 *split,const hacd::HaF32 *plane)
 {
 
 	hacd::HaF32 dp1 = fm_distToPlane(plane,p1);
@@ -362,79 +227,8 @@ void fm_intersectPointPlane(const hacd::HaF32 *p1,const hacd::HaF32 *p2,hacd::Ha
 
 }
 
-hacd::HaF32 fm_distance(const hacd::HaF32 *p1,const hacd::HaF32 *p2)
-{
-	hacd::HaF32 dx = p1[0] - p2[0];
-	hacd::HaF32 dy = p1[1] - p2[1];
-	hacd::HaF32 dz = p1[2] - p2[2];
 
-	return ::sqrt( dx*dx + dy*dy + dz *dz );
-}
-
-hacd::HaF32 fm_distanceSquared(const hacd::HaF32 *p1,const hacd::HaF32 *p2)
-{
-	hacd::HaF32 dx = p1[0] - p2[0];
-	hacd::HaF32 dy = p1[1] - p2[1];
-	hacd::HaF32 dz = p1[2] - p2[2];
-
-	return dx*dx + dy*dy + dz *dz;
-}
-
-void fm_subtract(const hacd::HaF32 *A,const hacd::HaF32 *B,hacd::HaF32 *diff) // compute A-B and store the result in 'diff'
-{
-	diff[0] = A[0]-B[0];
-	diff[1] = A[1]-B[1];
-	diff[2] = A[2]-B[2];
-}
-
-void fm_multiply(hacd::HaF32 *A,hacd::HaF32 scaler)
-{
-	A[0]*=scaler;
-	A[1]*=scaler;
-	A[2]*=scaler;
-}
-
-
-void fm_add(const hacd::HaF32 *A,const hacd::HaF32 *B,hacd::HaF32 *sum)
-{
-	sum[0] = A[0]+B[0];
-	sum[1] = A[1]+B[1];
-	sum[2] = A[2]+B[2];
-}
-
-
-void fm_copy3(const hacd::HaF32 *source,hacd::HaF32 *dest)
-{
-	dest[0] = source[0];
-	dest[1] = source[1];
-	dest[2] = source[2];
-}
-
-bool fm_intersectAABB(const hacd::HaF32 *bmin1,const hacd::HaF32 *bmax1,const hacd::HaF32 *bmin2,const hacd::HaF32 *bmax2)
-{
-	if ((bmin1[0] > bmax2[0]) || (bmin2[0] > bmax1[0])) return false;
-	if ((bmin1[1] > bmax2[1]) || (bmin2[1] > bmax1[1])) return false;
-	if ((bmin1[2] > bmax2[2]) || (bmin2[2] > bmax1[2])) return false;
-	return true;
-
-}
-
-
-
-static hacd::HaF32 Partial(const hacd::HaF32 *a,const hacd::HaF32 *p) 
-{
-	return (a[0]*p[1]) - (p[0]*a[1]);
-}
-
-hacd::HaF32  fm_areaTriangle(const hacd::HaF32 *p0,const hacd::HaF32 *p1,const hacd::HaF32 *p2)
-{
-	hacd::HaF32 A = Partial(p0,p1);
-	A+= Partial(p1,p2);
-	A+= Partial(p2,p0);
-	return A*0.5f;
-}
-
-void  fm_transform(const hacd::HaF32 matrix[16],const hacd::HaF32 v[3],hacd::HaF32 t[3]) // rotate and translate this point
+static void  fm_transform(const hacd::HaF32 matrix[16],const hacd::HaF32 v[3],hacd::HaF32 t[3]) // rotate and translate this point
 {
 	if ( matrix )
 	{
@@ -453,7 +247,7 @@ void  fm_transform(const hacd::HaF32 matrix[16],const hacd::HaF32 v[3],hacd::HaF
 	}
 }
 
-void  fm_rotate(const hacd::HaF32 matrix[16],const hacd::HaF32 v[3],hacd::HaF32 t[3]) // rotate and translate this point
+static void  fm_rotate(const hacd::HaF32 matrix[16],const hacd::HaF32 v[3],hacd::HaF32 t[3]) // rotate and translate this point
 {
 	if ( matrix )
 	{
@@ -475,44 +269,7 @@ void  fm_rotate(const hacd::HaF32 matrix[16],const hacd::HaF32 v[3],hacd::HaF32 
 
 
 
-hacd::HaF32 fm_computeBestFitAABB(hacd::HaU32 vcount,const hacd::HaF32 *points,hacd::HaU32 pstride,hacd::HaF32 *bmin,hacd::HaF32 *bmax) // returns the diagonal distance
-{
-
-	const hacd::HaU8 *source = (const hacd::HaU8 *) points;
-
-	bmin[0] = points[0];
-	bmin[1] = points[1];
-	bmin[2] = points[2];
-
-	bmax[0] = points[0];
-	bmax[1] = points[1];
-	bmax[2] = points[2];
-
-
-	for (hacd::HaU32 i=1; i<vcount; i++)
-	{
-		source+=pstride;
-		const hacd::HaF32 *p = (const hacd::HaF32 *) source;
-
-		if ( p[0] < bmin[0] ) bmin[0] = p[0];
-		if ( p[1] < bmin[1] ) bmin[1] = p[1];
-		if ( p[2] < bmin[2] ) bmin[2] = p[2];
-
-		if ( p[0] > bmax[0] ) bmax[0] = p[0];
-		if ( p[1] > bmax[1] ) bmax[1] = p[1];
-		if ( p[2] > bmax[2] ) bmax[2] = p[2];
-
-	}
-
-	hacd::HaF32 dx = bmax[0] - bmin[0];
-	hacd::HaF32 dy = bmax[1] - bmin[1];
-	hacd::HaF32 dz = bmax[2] - bmin[2];
-
-	return (hacd::HaF32) ::sqrt( dx*dx + dy*dy + dz*dz );
-
-}
-
-void fm_inverseRT(const hacd::HaF32 matrix[16],const hacd::HaF32 pos[3],hacd::HaF32 t[3]) // inverse rotate translate the point.
+static void fm_inverseRT(const hacd::HaF32 matrix[16],const hacd::HaF32 pos[3],hacd::HaF32 t[3]) // inverse rotate translate the point.
 {
 
 	hacd::HaF32 _x = pos[0] - matrix[3*4+0];
@@ -723,7 +480,7 @@ public:
 };
 
 
-bool fm_computeBestFitPlane(hacd::HaU32 vcount,
+static bool fm_computeBestFitPlane(hacd::HaU32 vcount,
 							const hacd::HaF32 *points,
 							hacd::HaU32 vstride,
 							const hacd::HaF32 *weights,
@@ -919,7 +676,7 @@ void computeOBB(hacd::HaU32 vcount,const hacd::HaF32 *points,hacd::HaU32 pstride
 //  q.z = c.z / s;
 //  q.w = s /2.0f;
 //  return q;
-void fm_rotationArc(const hacd::HaF32 *v0,const hacd::HaF32 *v1,hacd::HaF32 *quat)
+static void fm_rotationArc(const hacd::HaF32 *v0,const hacd::HaF32 *v1,hacd::HaF32 *quat)
 {
 	hacd::HaF32 cross[3];
 
@@ -944,7 +701,7 @@ void fm_rotationArc(const hacd::HaF32 *v0,const hacd::HaF32 *v1,hacd::HaF32 *qua
 	}
 }
 
-void  fm_setTranslation(const hacd::HaF32 *translation,hacd::HaF32 *matrix)
+static void  fm_setTranslation(const hacd::HaF32 *translation,hacd::HaF32 *matrix)
 {
 	matrix[12] = translation[0];
 	matrix[13] = translation[1];
@@ -952,7 +709,7 @@ void  fm_setTranslation(const hacd::HaF32 *translation,hacd::HaF32 *matrix)
 }
 
 
-void fm_eulerToQuat(hacd::HaF32 roll,hacd::HaF32 pitch,hacd::HaF32 yaw,hacd::HaF32 *quat) // convert euler angles to quaternion.
+static void fm_eulerToQuat(hacd::HaF32 roll,hacd::HaF32 pitch,hacd::HaF32 yaw,hacd::HaF32 *quat) // convert euler angles to quaternion.
 {
 	roll  *= 0.5f;
 	pitch *= 0.5f;
@@ -978,62 +735,7 @@ void fm_eulerToQuat(hacd::HaF32 roll,hacd::HaF32 pitch,hacd::HaF32 yaw,hacd::HaF
 }
 
 
-void  fm_eulerToQuat(const hacd::HaF32 *euler,hacd::HaF32 *quat) // convert euler angles to quaternion.
-{
-	fm_eulerToQuat(euler[0],euler[1],euler[2],quat);
-}
-
-void fm_matrixToQuat(const hacd::HaF32 *matrix,hacd::HaF32 *quat) // convert the 3x3 portion of a 4x4 matrix into a quaterion as x,y,z,w
-{
-
-	hacd::HaF32 tr = matrix[0*4+0] + matrix[1*4+1] + matrix[2*4+2];
-
-	// check the diagonal
-
-	if (tr > 0.0f )
-	{
-		hacd::HaF32 s = (hacd::HaF32) ::sqrtf( (tr + 1.0f) );
-		quat[3] = s * 0.5f;
-		s = 0.5f / s;
-		quat[0] = (matrix[1*4+2] - matrix[2*4+1]) * s;
-		quat[1] = (matrix[2*4+0] - matrix[0*4+2]) * s;
-		quat[2] = (matrix[0*4+1] - matrix[1*4+0]) * s;
-
-	}
-	else
-	{
-		// diagonal is negative
-		hacd::HaI32 nxt[3] = {1, 2, 0};
-		hacd::HaF32  qa[4];
-
-		hacd::HaI32 i = 0;
-
-		if (matrix[1*4+1] > matrix[0*4+0]) i = 1;
-		if (matrix[2*4+2] > matrix[i*4+i]) i = 2;
-
-		hacd::HaI32 j = nxt[i];
-		hacd::HaI32 k = nxt[j];
-
-		hacd::HaF32 s = ::sqrt ( ((matrix[i*4+i] - (matrix[j*4+j] + matrix[k*4+k])) + 1.0f) );
-
-		qa[i] = s * 0.5f;
-
-		if (s != 0.0f ) s = 0.5f / s;
-
-		qa[3] = (matrix[j*4+k] - matrix[k*4+j]) * s;
-		qa[j] = (matrix[i*4+j] + matrix[j*4+i]) * s;
-		qa[k] = (matrix[i*4+k] + matrix[k*4+i]) * s;
-
-		quat[0] = qa[0];
-		quat[1] = qa[1];
-		quat[2] = qa[2];
-		quat[3] = qa[3];
-	}
-
-
-}
-
-void fm_quatToMatrix(const hacd::HaF32 *quat,hacd::HaF32 *matrix) // convert quaterinion rotation to matrix, zeros out the translation component.
+static void fm_quatToMatrix(const hacd::HaF32 *quat,hacd::HaF32 *matrix) // convert quaterinion rotation to matrix, zeros out the translation component.
 {
 
 	hacd::HaF32 xx = quat[0]*quat[0];
@@ -1064,15 +766,7 @@ void fm_quatToMatrix(const hacd::HaF32 *quat,hacd::HaF32 *matrix) // convert qua
 
 }
 
-void fm_getTranslation(const hacd::HaF32 *matrix,hacd::HaF32 *t)
-{
-	t[0] = matrix[3*4+0];
-	t[1] = matrix[3*4+1];
-	t[2] = matrix[3*4+2];
-}
-
-
-void  fm_matrixMultiply(const hacd::HaF32 *pA,const hacd::HaF32 *pB,hacd::HaF32 *pM)
+static void  fm_matrixMultiply(const hacd::HaF32 *pA,const hacd::HaF32 *pB,hacd::HaF32 *pM)
 {
 	hacd::HaF32 a = pA[0*4+0] * pB[0*4+0] + pA[0*4+1] * pB[1*4+0] + pA[0*4+2] * pB[2*4+0] + pA[0*4+3] * pB[3*4+0];
 	hacd::HaF32 b = pA[0*4+0] * pB[0*4+1] + pA[0*4+1] * pB[1*4+1] + pA[0*4+2] * pB[2*4+1] + pA[0*4+3] * pB[3*4+1];
@@ -1118,7 +812,7 @@ void  fm_matrixMultiply(const hacd::HaF32 *pA,const hacd::HaF32 *pB,hacd::HaF32 
 
 
 
-void fm_planeToMatrix(const hacd::HaF32 *plane,hacd::HaF32 *matrix) // convert a plane equation to a 4x4 rotation matrix
+static void fm_planeToMatrix(const hacd::HaF32 *plane,hacd::HaF32 *matrix) // convert a plane equation to a 4x4 rotation matrix
 {
 	hacd::HaF32 ref[3] = { 0, 1, 0 };
 	hacd::HaF32 quat[4];
@@ -1131,7 +825,7 @@ void fm_planeToMatrix(const hacd::HaF32 *plane,hacd::HaF32 *matrix) // convert a
 }
 
 
-void fm_computeBestFitOBB(hacd::HaU32 vcount,
+static void fm_computeBestFitOBB(hacd::HaU32 vcount,
 						  const hacd::HaF32 *points,
 						  hacd::HaU32 pstride,
 						  hacd::HaF32 *sides,
@@ -1170,54 +864,6 @@ void fm_computeBestFitOBB(hacd::HaU32 vcount,
 			}
 		}
 	}
-}
-
-void fm_computeBestFitOBB(hacd::HaU32 vcount,const hacd::HaF32 *points,hacd::HaU32 pstride,hacd::HaF32 *sides,hacd::HaF32 *pos,hacd::HaF32 *quat,bool bruteForce)
-{
-	hacd::HaF32 matrix[16];
-	fm_computeBestFitOBB(vcount,points,pstride,sides,matrix,bruteForce);
-	fm_getTranslation(matrix,pos);
-	fm_matrixToQuat(matrix,quat);
-}
-
-void fm_computeBestFitABB(hacd::HaU32 vcount,const hacd::HaF32 *points,hacd::HaU32 pstride,hacd::HaF32 *sides,hacd::HaF32 *pos)
-{
-	hacd::HaF32 bmin[3];
-	hacd::HaF32 bmax[3];
-
-	bmin[0] = points[0];
-	bmin[1] = points[1];
-	bmin[2] = points[2];
-
-	bmax[0] = points[0];
-	bmax[1] = points[1];
-	bmax[2] = points[2];
-
-	const char *cp = (const char *) points;
-	for (hacd::HaU32 i=0; i<vcount; i++)
-	{
-		const hacd::HaF32 *p = (const hacd::HaF32 *) cp;
-
-		if ( p[0] < bmin[0] ) bmin[0] = p[0];
-		if ( p[1] < bmin[1] ) bmin[1] = p[1];
-		if ( p[2] < bmin[2] ) bmin[2] = p[2];
-
-		if ( p[0] > bmax[0] ) bmax[0] = p[0];
-		if ( p[1] > bmax[1] ) bmax[1] = p[1];
-		if ( p[2] > bmax[2] ) bmax[2] = p[2];
-
-		cp+=pstride;
-	}
-
-
-	sides[0] = bmax[0] - bmin[0];
-	sides[1] = bmax[1] - bmin[1];
-	sides[2] = bmax[2] - bmin[2];
-
-	pos[0] = bmin[0]+sides[0]*0.5f;
-	pos[1] = bmin[1]+sides[1]*0.5f;
-	pos[2] = bmin[2]+sides[2]*0.5f;
-
 }
 
 template <class T> class Rect3d
@@ -1307,7 +953,7 @@ void splitRect(hacd::HaU32 axis,
 
 
 
-bool fm_computeSplitPlane(hacd::HaU32 vcount,
+static bool fm_computeSplitPlane(hacd::HaU32 vcount,
 						  const hacd::HaF32 *vertices,
 						  hacd::HaU32 /* tcount */,
 						  const hacd::HaU32 * /* indices */,
@@ -1435,368 +1081,6 @@ bool fm_computeSplitPlane(hacd::HaU32 vcount,
 
 
 
-
-class CTri
-{
-public:
-	CTri(void) { };
-
-  CTri(const hacd::HaF32 *p1,const hacd::HaF32 *p2,const hacd::HaF32 *p3,hacd::HaU32 i1,hacd::HaU32 i2,hacd::HaU32 i3)
-  {
-    mProcessed = 0;
-    mI1 = i1;
-    mI2 = i2;
-    mI3 = i3;
-
-  	mP1.Set(p1);
-  	mP2.Set(p2);
-  	mP3.Set(p3);
-  	mPlaneD = fm_computePlane(mP1.Ptr(),mP2.Ptr(),mP3.Ptr(),mNormal.Ptr());
-	}
-
-  hacd::HaF32 Facing(const CTri &t)
-  {
-		hacd::HaF32 d = fm_dot(mNormal.Ptr(),t.mNormal.Ptr());
-		return d;
-  }
-
-  // clip this line segment against this triangle.
-  bool clip(const Vector3d<hacd::HaF32> &start,Vector3d<hacd::HaF32> &end) const
-  {
-    Vector3d<hacd::HaF32> sect;
-
-    bool hit = fm_lineIntersectsTriangle(start.Ptr(), end.Ptr(), mP1.Ptr(), mP2.Ptr(), mP3.Ptr(), sect.Ptr() );
-
-    if ( hit )
-    {
-      end = sect;
-    }
-    return hit;
-  }
-
-	void addTri(hacd::HaU32 *indices,hacd::HaU32 i1,hacd::HaU32 i2,hacd::HaU32 i3,hacd::HaU32 &tcount) const
-	{
-		indices[tcount*3+0] = i1;
-		indices[tcount*3+1] = i2;
-		indices[tcount*3+2] = i3;
-		tcount++;
-	}
-
-	hacd::HaF32 getVolume(ConvexDecompInterface *) const
-	{
-		hacd::HaU32 indices[8*3];
-
-
-    hacd::HaU32 tcount = 0;
-
-    addTri(indices,0,1,2,tcount);
-    addTri(indices,3,4,5,tcount);
-
-    addTri(indices,0,3,4,tcount);
-    addTri(indices,0,4,1,tcount);
-
-    addTri(indices,1,4,5,tcount);
-    addTri(indices,1,5,2,tcount);
-
-    addTri(indices,0,3,5,tcount);
-    addTri(indices,0,5,2,tcount);
-
-		hacd::HaF32 v = fm_computeMeshVolume(mP1.Ptr(), tcount, indices );
-
-		return v;
-
-	}
-
-	hacd::HaF32 raySect(const Vector3d<hacd::HaF32> &p,const Vector3d<hacd::HaF32> &dir,Vector3d<hacd::HaF32> &sect) const
-	{
-		hacd::HaF32 plane[4];
-
-    plane[0] = mNormal.x;
-    plane[1] = mNormal.y;
-    plane[2] = mNormal.z;
-    plane[3] = mPlaneD;
-
-		Vector3d<hacd::HaF32> dest;
-
-    dest.x = p.x+dir.x*10000;
-    dest.y = p.y+dir.y*10000;
-    dest.z = p.z+dir.z*10000;
-
-
-    fm_intersectPointPlane( p.Ptr(), dest.Ptr(), sect.Ptr(), plane );
-
-    return fm_distance(sect.Ptr(),p.Ptr()); // return the intersection distance.
-
-	}
-
-  hacd::HaF32 planeDistance(const Vector3d<hacd::HaF32> &p) const
-  {
-		hacd::HaF32 plane[4];
-
-    plane[0] = mNormal.x;
-    plane[1] = mNormal.y;
-    plane[2] = mNormal.z;
-    plane[3] = mPlaneD;
-
-		return fm_distToPlane(plane,p.Ptr());
-
-  }
-
-	bool samePlane(const CTri &t) const
-	{
-		const hacd::HaF32 THRESH = 0.001f;
-    hacd::HaF32 dd = fabs( t.mPlaneD - mPlaneD );
-    if ( dd > THRESH ) return false;
-    dd = fabs( t.mNormal.x - mNormal.x );
-    if ( dd > THRESH ) return false;
-    dd = fabs( t.mNormal.y - mNormal.y );
-    if ( dd > THRESH ) return false;
-    dd = fabs( t.mNormal.z - mNormal.z );
-    if ( dd > THRESH ) return false;
-    return true;
-	}
-
-	bool hasIndex(hacd::HaU32 i) const
-	{
-		if ( i == mI1 || i == mI2 || i == mI3 ) return true;
-		return false;
-	}
-
-  bool sharesEdge(const CTri &t) const
-  {
-    bool ret = false;
-    hacd::HaU32 count = 0;
-
-		if ( t.hasIndex(mI1) ) count++;
-	  if ( t.hasIndex(mI2) ) count++;
-		if ( t.hasIndex(mI3) ) count++;
-
-    if ( count >= 2 ) ret = true;
-
-    return ret;
-  }
-
-  hacd::HaF32 area(void)
-  {
-		hacd::HaF32 a = mConcavity * fm_areaTriangle(mP1.Ptr(),mP2.Ptr(),mP3.Ptr());
-    return a;
-  }
-
-  void addWeighted(WpointVector &list,ConvexDecompInterface * /* callback */)
-  {
-
-    Wpoint p1(mP1,mC1);
-    Wpoint p2(mP2,mC2);
-    Wpoint p3(mP3,mC3);
-
-    Vector3d<hacd::HaF32> d1,d2,d3;
-
-    fm_subtract(mNear1.Ptr(),mP1.Ptr(),d1.Ptr());
-    fm_subtract(mNear2.Ptr(),mP2.Ptr(),d2.Ptr());
-    fm_subtract(mNear3.Ptr(),mP3.Ptr(),d3.Ptr());
-
-    fm_multiply(d1.Ptr(),WSCALE);
-    fm_multiply(d2.Ptr(),WSCALE);
-    fm_multiply(d3.Ptr(),WSCALE);
-
-    fm_add(d1.Ptr(), mP1.Ptr(), d1.Ptr());
-    fm_add(d2.Ptr(), mP2.Ptr(), d2.Ptr());
-    fm_add(d3.Ptr(), mP3.Ptr(), d3.Ptr());
-
-    Wpoint p4(d1,mC1);
-    Wpoint p5(d2,mC2);
-    Wpoint p6(d3,mC3);
-
-    list.push_back(p1);
-    list.push_back(p2);
-    list.push_back(p3);
-
-    list.push_back(p4);
-    list.push_back(p5);
-    list.push_back(p6);
-
-  }
-
-  Vector3d<hacd::HaF32>	mP1;
-  Vector3d<hacd::HaF32>	mP2;
-  Vector3d<hacd::HaF32>	mP3;
-  Vector3d<hacd::HaF32> mNear1;
-  Vector3d<hacd::HaF32> mNear2;
-  Vector3d<hacd::HaF32> mNear3;
-  Vector3d<hacd::HaF32> mNormal;
-  hacd::HaF32           mPlaneD;
-  hacd::HaF32           mConcavity;
-  hacd::HaF32           mC1;
-  hacd::HaF32           mC2;
-  hacd::HaF32           mC3;
-  hacd::HaU32    mI1;
-  hacd::HaU32    mI2;
-  hacd::HaU32    mI3;
-  hacd::HaI32             mProcessed; // already been added...
-};
-
-typedef hacd::vector< CTri > CTriVector;
-
-bool featureMatch(CTri &m,const CTriVector &tris)
-{
-	bool ret = false;
-	hacd::HaF32 neardot = 0.707f;
-
-	m.mConcavity = 0;
-
-	CTriVector::const_iterator i;
-
-	CTri nearest;
-
-	for (i=tris.begin(); i!=tris.end(); ++i)
-	{
-		const CTri &t = (*i);
-		if ( t.samePlane(m) )
-		{
-			ret = false;
-			break;
-		}
-
-		hacd::HaF32 dot = fm_dot(t.mNormal.Ptr(),m.mNormal.Ptr());
-
-		if ( dot > neardot )
-		{
-
-			hacd::HaF32 d1 = t.planeDistance( m.mP1 );
-			hacd::HaF32 d2 = t.planeDistance( m.mP2 );
-			hacd::HaF32 d3 = t.planeDistance( m.mP3 );
-
-			if ( d1 > 0.001f || d2 > 0.001f || d3 > 0.001f ) // can't be near coplaner!
-			{
-				neardot = dot;
-				Vector3d<hacd::HaF32> n1,n2,n3;
-				t.raySect( m.mP1, m.mNormal, m.mNear1 );
-				t.raySect( m.mP2, m.mNormal, m.mNear2 );
-				t.raySect( m.mP3, m.mNormal, m.mNear3 );
-				nearest = t;
-				ret = true;
-			}
-		}
-	}
-
-	if ( ret )
-	{
-		m.mC1 = fm_distance(m.mP1.Ptr(), m.mNear1.Ptr() );
-		m.mC2 = fm_distance(m.mP2.Ptr(), m.mNear2.Ptr() );
-		m.mC3 = fm_distance(m.mP3.Ptr(), m.mNear3.Ptr() );
-		m.mConcavity = m.mC1;
-		if ( m.mC2 > m.mConcavity ) m.mConcavity = m.mC2;
-		if ( m.mC3 > m.mConcavity ) m.mConcavity = m.mC3;
-	}
-	return ret;
-}
-
-hacd::HaF32 computeConcavity(hacd::HaU32 vcount,
-					const hacd::HaF32 *vertices,
-					hacd::HaU32 tcount,
-					const hacd::HaU32 *indices,
-					hacd::HaF32 *plane,      // plane equation to split on
-					hacd::HaF32 &volume)
-{
-
-
-	hacd::HaF32 cret = 0;
-	volume = 1;
-
-	HACD::HullResult  result;
-	HACD::HullLibrary hl;
-	HACD::HullDesc    desc;
-
-	desc.mMaxVertices = 256;
-	desc.mVcount       = vcount;
-	desc.mVertices     = vertices;
-	desc.mVertexStride = sizeof(hacd::HaF32)*3;
-
-	HACD::HullError ret = hl.CreateConvexHull(desc,result);
-
-	if ( ret == HACD::QE_OK )
-	{
-		// ok..now..for each triangle on the original mesh..
-		// we extrude the points to the nearest point on the hull.
-		const hacd::HaU32 *source = result.mIndices;
-
-		CTriVector tris;
-
-		for (hacd::HaU32 i=0; i<result.mNumTriangles; i++)
-		{
-			hacd::HaU32 i1 = *source++;
-			hacd::HaU32 i2 = *source++;
-			hacd::HaU32 i3 = *source++;
-
-			const hacd::HaF32 *p1 = &result.mOutputVertices[i1*3];
-			const hacd::HaF32 *p2 = &result.mOutputVertices[i2*3];
-			const hacd::HaF32 *p3 = &result.mOutputVertices[i3*3];
-
-			CTri t(p1,p2,p3,i1,i2,i3); //
-			tris.push_back(t);
-		}
-
-		// we have now pre-computed the plane equation for each triangle in the convex hull..
-
-		hacd::HaF32 totalVolume = 0;
-
-		const hacd::HaU32 *src = indices;
-		for (hacd::HaU32 i=0; i<tcount; i++)
-		{
-
-			hacd::HaU32 i1 = *src++;
-			hacd::HaU32 i2 = *src++;
-			hacd::HaU32 i3 = *src++;
-
-			const hacd::HaF32 *p1 = &vertices[i1*3];
-			const hacd::HaF32 *p2 = &vertices[i2*3];
-			const hacd::HaF32 *p3 = &vertices[i3*3];
-
-			CTri t(p1,p2,p3,i1,i2,i3);
-
-			featureMatch(t,tris);
-
-			if ( t.mConcavity > CONCAVE_THRESH )
-			{
-				totalVolume+=t.getVolume(0);
-			}
-
-		}
-		fm_computeSplitPlane( vcount, vertices, tcount, indices, plane );
-		cret = totalVolume;
-		hl.ReleaseResult(result);
-	}
-	return cret;
-}
-
-
-
-
-
-class FaceTri
-{
-public:
-	FaceTri(void) { };
-
-  FaceTri(const hacd::HaF32 *vertices,hacd::HaU32 i1,hacd::HaU32 i2,hacd::HaU32 i3)
-  {
-  	fm_copy3(&vertices[i1*3],mP1 );
-  	fm_copy3(&vertices[i2*3],mP2 );
-  	fm_copy3(&vertices[i3*3],mP3 );
-  }
-
-  hacd::HaF32	mP1[3];
-  hacd::HaF32	mP2[3];
-  hacd::HaF32 	mP3[3];
-  hacd::HaF32  mNormal[3];
-
-};
-
-
-
-
-
-
 #define FM_DEFAULT_GRANULARITY 0.001f  // 1 millimeter is the default granularity
 
 class fm_VertexIndex
@@ -1813,9 +1097,8 @@ public:
 	virtual bool            saveAsObj(const char *fname,hacd::HaU32 tcount,hacd::HaU32 *indices) = 0;
 };
 
-fm_VertexIndex * fm_createVertexIndex(hacd::HaF64 granularity,bool snapToGrid); // create an indexed vertex system for doubles
-fm_VertexIndex * fm_createVertexIndex(hacd::HaF32 granularity,bool snapToGrid);  // create an indexed vertext system for floats
-void             fm_releaseVertexIndex(fm_VertexIndex *vindex);
+static fm_VertexIndex * fm_createVertexIndex(hacd::HaF64 granularity,bool snapToGrid); // create an indexed vertex system for doubles
+static void             fm_releaseVertexIndex(fm_VertexIndex *vindex);
 
 
 
@@ -2746,19 +2029,13 @@ private:
 	KdTree  mKdTree;
 };
 
-fm_VertexIndex * fm_createVertexIndex(hacd::HaF64 granularity,bool snapToGrid) // create an indexed vertex system for doubles
+static fm_VertexIndex * fm_createVertexIndex(hacd::HaF32 granularity,bool snapToGrid)  // create an indexed vertext system for floats
 {
 	MyVertexIndex *ret = HACD_NEW(MyVertexIndex)(granularity,snapToGrid);
 	return static_cast< fm_VertexIndex *>(ret);
 }
 
-fm_VertexIndex * fm_createVertexIndex(hacd::HaF32 granularity,bool snapToGrid)  // create an indexed vertext system for floats
-{
-	MyVertexIndex *ret = HACD_NEW(MyVertexIndex)(granularity,snapToGrid);
-	return static_cast< fm_VertexIndex *>(ret);
-}
-
-void          fm_releaseVertexIndex(fm_VertexIndex *vindex)
+static void          fm_releaseVertexIndex(fm_VertexIndex *vindex)
 {
 	MyVertexIndex *m = static_cast< MyVertexIndex *>(vindex);
 	delete m;
@@ -2896,7 +2173,7 @@ enum PlaneTriResult
 	PTR_SPLIT,
 };
 
-PlaneTriResult fm_getSidePlane(const hacd::HaF32 *p,const hacd::HaF32 *plane,hacd::HaF32 epsilon)
+static PlaneTriResult fm_getSidePlane(const hacd::HaF32 *p,const hacd::HaF32 *plane,hacd::HaF32 epsilon)
 {
 	PlaneTriResult ret = PTR_ON_PLANE;
 
@@ -2916,7 +2193,7 @@ PlaneTriResult fm_getSidePlane(const hacd::HaF32 *p,const hacd::HaF32 *plane,hac
 
 
 
-PlaneTriResult fm_planeTriIntersection(const hacd::HaF32 plane[4],    // the plane equation in Ax+By+Cz+D format
+static PlaneTriResult fm_planeTriIntersection(const hacd::HaF32 plane[4],    // the plane equation in Ax+By+Cz+D format
 									   const hacd::HaF32 *triangle, // the source triangle.
 									   hacd::HaU32 tstride,  // stride in bytes of the input and output *vertices*
 									   hacd::HaF32        epsilon,  // the co-planer epsilon value.
@@ -3060,7 +2337,7 @@ public:
 
 
 
-PlaneTriResult fm_planeTriIntersection(const hacd::HaF32 *_plane,    // the plane equation in Ax+By+Cz+D format
+static PlaneTriResult fm_planeTriIntersection(const hacd::HaF32 *_plane,    // the plane equation in Ax+By+Cz+D format
 									   const hacd::HaF32 *triangle, // the source triangle.
 									   hacd::HaU32 tstride,  // stride in bytes of the input and output *vertices*
 									   hacd::HaF32        epsilon,  // the co-planar epsilon value.
@@ -3271,20 +2548,6 @@ public:
 		}
 	}
 
-	bool isDuplicate(hacd::HaU32 i1,hacd::HaU32 i2,hacd::HaU32 i3,hacd::HaU32 ci1,hacd::HaU32 ci2,hacd::HaU32 ci3)
-	{
-		hacd::HaU32 dcount = 0;
-
-		assert( i1 != i2 && i1 != i3 && i2 != i3 );
-		assert( ci1 != ci2 && ci1 != ci3 && ci2 != ci3 );
-
-		if ( i1 == ci1 || i1 == ci2 || i1 == ci3 ) dcount++;
-		if ( i2 == ci1 || i2 == ci2 || i2 == ci3 ) dcount++;
-		if ( i3 == ci1 || i3 == ci2 || i3 == ci3 ) dcount++;
-
-		return dcount == 3;
-	}
-
 	virtual void ConvexDecompResult(const ConvexResult &result)
 	{
 		ConvexResult r;
@@ -3297,128 +2560,153 @@ public:
 		mResults.push_back(r);
 	}
 
-  void doConvexDecomposition(hacd::HaU32           vcount,
-                             const hacd::HaF32           *vertices,
-                             hacd::HaU32           tcount,
-                             const hacd::HaU32    *indices,
-                             const Cdesc            &cdesc,
-                             hacd::HaU32           depth)
+void doConvexDecomposition(hacd::HaU32 vcount,
+							const hacd::HaF32 *vertices,
+							hacd::HaU32 tcount,
+							const hacd::HaU32 *indices,
+							Cdesc &cdesc,
+							hacd::HaU32 depth)
+{
 
-  {
+	// first see if the input mesh is co-planar.
+	// If it is, then we return because we can't do anything with a co-planer mesh
+	bool isCoplanar = fm_isMeshCoplanar(tcount,indices,vertices,true);
+	if ( isCoplanar ) return;
 
-    hacd::HaF32 plane[4];
+	// Next build a convex hull for the input vertices for this mesh fragment
+	HACD::HullResult result;
+	HACD::HullLibrary hl;
+	HACD::HullDesc   desc;
+	desc.mVcount = vcount;
+	desc.mVertices = vertices;
+	desc.mVertexStride = sizeof(hacd::HaF32)*3;
+	HACD::HullError ret = hl.CreateConvexHull(desc,result);
+	if ( ret != HACD::QE_OK )
+	{
+		return; // unable to build a hull for this remaining piece of mesh; so return.
+	}
 
-    bool split = false;
+	bool split = false;
+	if ( depth < cdesc.mMaxDepth ) // if have not reached the maximum depth
+	{
+		// compute the volume of the convex hull prior to the plist.
+		hacd::HaF32 hullVolume = fm_computeMeshVolume(result.mOutputVertices,result.mNumTriangles,result.mIndices);
+		if (depth == 0 )
+		{
+			cdesc.mMasterVolume = hullVolume;
+		}
+		hacd::HaF32 percent = (hullVolume*100)/cdesc.mMasterVolume;
+		// if this convex hull is still considered significant enough in size to keep splitting...
+		if ( percent > cdesc.mMeshVolumePercent ) // if not too small of a feature...
+		{
+			// find the split plane by computing the OBB and slicing in half
+			hacd::HaF32 plane[4];
+			split = fm_computeSplitPlane(result.mNumOutputVertices,result.mOutputVertices,result.mNumTriangles,result.mIndices,plane);
+			if ( split )
+			{
+				SimpleMesh mesh(vcount, tcount, vertices, indices);
+				SimpleMesh leftMesh;
+				SimpleMesh rightMesh;
+				splitMesh(plane,mesh,leftMesh,rightMesh);
 
-    bool isCoplanar = fm_isMeshCoplanar(tcount,indices,vertices,true);
+				if ( leftMesh.mTcount && rightMesh.mTcount )
+				{
+					split = false;
+					hacd::HaF32 volumeA=0;
+					hacd::HaF32 volumeB=0;
+					// build the convex hull for the left split mesh and it's volume.
+					{
+						HACD::HullLibrary hl;
+						HACD::HullDesc   desc;
+						HACD::HullResult result;
+						desc.mVcount = leftMesh.mVcount;
+						desc.mVertices = leftMesh.mVertices;
+						desc.mVertexStride = sizeof(hacd::HaF32)*3;
+						HACD::HullError ret = hl.CreateConvexHull(desc,result);
+						if ( ret == HACD::QE_OK )
+						{
+							volumeA = fm_computeMeshVolume(result.mOutputVertices, result.mNumTriangles, result.mIndices );
+						}
+					}
+					{
+						HACD::HullLibrary hl;
+						HACD::HullDesc   desc;
+						HACD::HullResult result;
+						desc.mVcount = rightMesh.mVcount;
+						desc.mVertices = rightMesh.mVertices;
+						desc.mVertexStride = sizeof(hacd::HaF32)*3;
+						HACD::HullError ret = hl.CreateConvexHull(desc,result);
+						if ( ret == HACD::QE_OK )
+						{
+							volumeB = fm_computeMeshVolume(result.mOutputVertices, result.mNumTriangles, result.mIndices );
+						}
+					}
 
-    if ( isCoplanar ) // we can't do convex decomposition on co-planar meshes!
-    {
-      // skipping co-planar mesh here...
-    }
-    else
-    {
-      if ( depth < cdesc.mMaxDepth )
-      {
-        if ( cdesc.mConcavePercent >= 0 )
-        {
-      		hacd::HaF32 volume;
-      		hacd::HaF32 c = computeConcavity( vcount, vertices, tcount, indices, plane, volume );
-      		hacd::HaF32 percent = (c*100.0f)/cdesc.mMasterVolume;
-      		if ( percent > cdesc.mConcavePercent ) // if great than 5% of the total volume is concave, go ahead and keep splitting.
-      		{
-            split = true;
-          }
-        }
+					// ok, now the percentage difference volume between the two hulls seperate versus the two hulls combined.
+					hacd::HaF32 percent = ((hullVolume - (volumeA+volumeB))*100) / hullVolume;
+					if ( percent < cdesc.mConcavePercent )
+					{
 
-        hacd::HaF32 mvolume = fm_computeMeshVolume(vertices, tcount, indices );
-        hacd::HaF32 mpercent = (mvolume*100.0f)/cdesc.mMasterMeshVolume;
-        if ( mpercent < cdesc.mMeshVolumePercent )
-        {
-          split = false; // it's too tiny to bother with!
-        }
+					}
+					else
+					{
+						split = true;  // it's concave, go ahead and split it!!
+					}
+				}
+				if ( split )
+				{
 
-        if ( split )
-        {
-          split = fm_computeSplitPlane(vcount,vertices,tcount,indices,plane);
-        }
+					if ( leftMesh.mTcount )
+					{
+						doConvexDecomposition(leftMesh.mVcount, leftMesh.mVertices, leftMesh.mTcount,leftMesh.mIndices,cdesc,depth+1);
+					}
+					if ( rightMesh.mTcount )
+					{
+						doConvexDecomposition(rightMesh.mVcount, rightMesh.mVertices, rightMesh.mTcount,rightMesh.mIndices, cdesc, depth+1);
+					}
+				}
+			}
+		}
+	}
+	if ( !split )
+	{
+		ConvexResult r;
+		r.mHullIndices = result.mIndices;
+		r.mHullVertices = result.mOutputVertices;
+		r.mHullTcount = result.mNumTriangles;
+		r.mHullVcount = result.mNumOutputVertices;
+		cdesc.mCallback->ConvexDecompResult(r);
+		hl.ReleaseResult(result); // do not release the result!
 
-      }
-
-      if ( depth >= cdesc.mMaxDepth || !split )
-      {
-
-		  HACD::HullResult result;
-		  HACD::HullLibrary hl;
-		  HACD::HullDesc   desc;
-
-        desc.mVcount       = vcount;
-        desc.mVertices     = vertices;
-        desc.mVertexStride = sizeof(hacd::HaF32)*3;
-
-		HACD::HullError ret = hl.CreateConvexHull(desc,result);
-
-		if ( ret == HACD::QE_OK )
-        {
-    			ConvexResult r;
-				r.mHullIndices = result.mIndices;
-				r.mHullVertices = result.mOutputVertices;
-				r.mHullTcount = result.mNumTriangles;
-				r.mHullVcount = result.mNumOutputVertices;
-				cdesc.mCallback->ConvexDecompResult(r);
-				hl.ReleaseResult(result); // do not release the result!
-        }
-
-        return;
-      }
-
-      SimpleMesh mesh(vcount, tcount, vertices, indices);
-      SimpleMesh leftMesh;
-      SimpleMesh rightMesh;
-      splitMesh(plane,mesh,leftMesh,rightMesh);
-
-      if ( leftMesh.mTcount )
-      {
-        doConvexDecomposition(leftMesh.mVcount, leftMesh.mVertices, leftMesh.mTcount,leftMesh.mIndices,cdesc,depth+1);
-      }
-
-      if ( rightMesh.mTcount )
-      {
-        doConvexDecomposition(rightMesh.mVcount, rightMesh.mVertices, rightMesh.mTcount,rightMesh.mIndices, cdesc, depth+1);
-      }
-    }
-  }
-
-  virtual hacd::HaU32 performConvexDecomposition(const DecompDesc &desc) // returns the number of hulls produced.
-  {
-	  Cdesc cdesc;
-	  cdesc.mMaxDepth			= desc.mDepth;
-	  cdesc.mConcavePercent		= desc.mCpercent;
-	  cdesc.mMeshVolumePercent	= desc.mMeshVolumePercent;
-	  cdesc.mCallback			= this;
+		if ( cdesc.mICallback )
+		{
+			hacd::HaF32 progress = (hacd::HaF32)cdesc.mOutputCount / (hacd::HaF32)cdesc.mOutputPow2;
+			cdesc.mOutputCount++;
+			cdesc.mICallback->ReportProgress("SplittingMesh", progress );
+		}
 
 
-	  HACD::HullResult result;
-	  HACD::HullLibrary hl;
-	  HACD::HullDesc   hdesc;
-	  hdesc.mVcount       = desc.mVcount;
-	  hdesc.mVertices     = desc.mVertices;
-	  hdesc.mVertexStride = sizeof(hacd::HaF32)*3;
-	  hdesc.mMaxVertices  = desc.mMaxVertices; // maximum number of vertices allowed in the output
-	  HACD::HullError eret = hl.CreateConvexHull(hdesc,result);
+	}
+}
 
-	  if ( eret == HACD::QE_OK )
-	  {
-		  cdesc.mMasterVolume = fm_computeMeshVolume( result.mOutputVertices, result.mNumTriangles, result.mIndices ); // the volume of the hull.
-		  cdesc.mMasterMeshVolume = fm_computeMeshVolume( desc.mVertices, desc.mTcount, desc.mIndices );
-		  hl.ReleaseResult(result);
-		  const hacd::HaU32 *indices = desc.mIndices;
-		  size_t tcount               = desc.mTcount;
-		  doConvexDecomposition(desc.mVcount, desc.mVertices, tcount, indices, cdesc, 0);
-	  }
-
-	  return mResults.size();
-  }
+	virtual hacd::HaU32 performConvexDecomposition(const DecompDesc &desc) // returns the number of hulls produced.
+	{
+		Cdesc cdesc;
+		cdesc.mMaxDepth			= desc.mDepth;
+		cdesc.mConcavePercent	= desc.mCpercent;
+		cdesc.mMeshVolumePercent= desc.mMeshVolumePercent;
+		cdesc.mCallback			= this;
+		cdesc.mICallback		= desc.mCallback;
+		cdesc.mOutputCount = 0;
+		hacd::HaU32 p2[16] = { 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536 };
+		if ( cdesc.mMaxDepth > 10 )
+			cdesc.mMaxDepth = 10;
+		else if ( cdesc.mMaxDepth < 1 )
+			cdesc.mMaxDepth = 1;
+		cdesc.mOutputPow2 = p2[ cdesc.mMaxDepth-1];
+		doConvexDecomposition(desc.mVcount, desc.mVertices, desc.mTcount, desc.mIndices, cdesc, 0);
+		return mResults.size();
+	}
 
   virtual void release(void)
   {

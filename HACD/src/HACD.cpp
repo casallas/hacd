@@ -173,6 +173,7 @@ public:
 
 			if ( desc.mDecompositionDepth ) // if using legacy ACD
 			{
+				TIMEIT("Perform ACD");
 				CONVEX_DECOMPOSITION::ConvexDecomposition *cd = CONVEX_DECOMPOSITION::createConvexDecomposition();
 
 				CONVEX_DECOMPOSITION::DecompDesc dcompDesc;
@@ -183,8 +184,9 @@ public:
 				dcompDesc.mVcount		= desc.mVertexCount;
 				dcompDesc.mMaxVertices	= desc.mMaxHullVertices;
 				dcompDesc.mDepth		= desc.mDecompositionDepth;
-				dcompDesc.mCpercent		= desc.mConcavity;
-				dcompDesc.mMeshVolumePercent = 0.001f;
+				dcompDesc.mCpercent		= desc.mConcavity*10;
+				dcompDesc.mMeshVolumePercent = desc.mSmallClusterThreshold;
+				dcompDesc.mCallback		= desc.mCallback;
 
 				ret = cd->performConvexDecomposition(dcompDesc);
 

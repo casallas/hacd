@@ -42,6 +42,7 @@ public:
 		mCpercent = 4;
 		mMeshVolumePercent = 0.01f;
 		mMaxVertices = 32;
+		mCallback = NULL;
   }
 
 // describes the input triangle.
@@ -53,6 +54,7 @@ public:
 	hacd::HaU32			mDepth;    // depth to split, a maximum of 10, generally not over 7.
 	hacd::HaF32			mCpercent; // the concavity threshold percentage.  0=20 is reasonable.
 	hacd::HaF32			mMeshVolumePercent; // if less than this percentage of the overall mesh volume, ignore
+	hacd::ICallback		*mCallback;
 
 // hull output limits.
 	hacd::HaU32		mMaxVertices; // maximum number of vertices in the output hull. Recommended 32 or less.
