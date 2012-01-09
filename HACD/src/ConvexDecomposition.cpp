@@ -7,6 +7,7 @@
 
 #include "ConvexDecomposition.h"
 #include "ConvexHull.h"
+#include "dgConvexHull3d.h"
 
 #pragma warning(disable:4702)
 #pragma warning(disable:4996 4100)
@@ -2119,52 +2120,6 @@ static void addTri(const hacd::HaF32 *p1,
 	indices.push_back(i3);
 }
 
-#if 0
-HACD_INLINE void rotationArc(const PxVec3 &v0,const PxVec3 &v1,PxQuat &quat)
-{
-	PxVec3 cross = v0.cross(v1);
-	hacd::HaF32 d = v0.dot(v1);
-
-	if(d<=-1.0f) // 180 about x axis
-	{
-		quat.x = 1.0f;
-		quat.y = quat.z = quat.w =0.0f;
-		return;
-	}
-
-	hacd::HaF32 s = PxSqrt((1+d)*2);
-	hacd::HaF32 recip = 1.0f / s;
-
-	quat.x = cross.x * recip;
-	quat.y = cross.y * recip;
-	quat.z = cross.z * recip;
-	quat.w = s * 0.5f;
-
-}
-
-void computePlaneQuad(const hacd::HaF32 *planeEquation,PxVec3 *quad)
-{
-	PxVec3 ref(0,1,0);
-	PxQuat quat;
-	PxVec3 normal(planeEquation[0],planeEquation[1],planeEquation[2]);
-	rotationArc(ref,normal,quat);
-	PxMat44 matrix(quat);
-
-	PxVec3 origin(0,-planeEquation[3],0);
-	PxVec3 center = matrix.transform(origin);
-#define PLANE_DIST 1000
-	PxVec3 upperLeft(-PLANE_DIST,0,-PLANE_DIST);
-	PxVec3 upperRight(PLANE_DIST,0,-PLANE_DIST);
-	PxVec3 lowerRight(PLANE_DIST,0,PLANE_DIST);
-	PxVec3 lowerLeft(-PLANE_DIST,0,PLANE_DIST);
-
-	quad[0] = matrix.transform(upperLeft);
-	quad[1] = matrix.transform(upperRight);
-	quad[2] = matrix.transform(lowerRight);
-	quad[3] = matrix.transform(lowerLeft);
-}
-#endif
-
 enum PlaneTriResult
 {
 	PTR_ON_PLANE,
@@ -2333,7 +2288,58 @@ public:
 	hacd::HaI32           mVcount;
 	point<Type>   mVertices[MAXPTS];
 };
+/* a = b - c */
+#define vector(a,b,c) \
+	(a)[0] = (b)[0] - (c)[0];	\
+	(a)[1] = (b)[1] - (c)[1];	\
+	(a)[2] = (b)[2] - (c)[2];
 
+
+
+#define innerProduct(v,q) \
+	((v)[0] * (q)[0] + \
+	(v)[1] * (q)[1] + \
+	(v)[2] * (q)[2])
+
+#define crossProduct(a,b,c) \
+	(a)[0] = (b)[1] * (c)[2] - (c)[1] * (b)[2]; \
+	(a)[1] = (b)[2] * (c)[0] - (c)[2] * (b)[0]; \
+	(a)[2] = (b)[0] * (c)[1] - (c)[0] * (b)[1];
+
+
+static bool fm_rayIntersectsTriangle(const hacd::HaF32 *p,const hacd::HaF32 *d,const hacd::HaF32 *v0,const hacd::HaF32 *v1,const hacd::HaF32 *v2,hacd::HaF32 &t)
+{
+	hacd::HaF32 e1[3],e2[3],h[3],s[3],q[3];
+	hacd::HaF32 a,f,u,v;
+
+	vector(e1,v1,v0);
+	vector(e2,v2,v0);
+	crossProduct(h,d,e2);
+	a = innerProduct(e1,h);
+
+	if (a > -0.00001 && a < 0.00001)
+		return(false);
+
+	f = 1/a;
+	vector(s,p,v0);
+	u = f * (innerProduct(s,h));
+
+	if (u < 0.0 || u > 1.0)
+		return(false);
+
+	crossProduct(q,s,e1);
+	v = f * innerProduct(d,q);
+	if (v < 0.0 || u + v > 1.0)
+		return(false);
+	// at this stage we can compute t to find out where
+	// the intersection point is on the line
+	t = f * innerProduct(e2,q);
+	if (t > 0) // ray intersection
+		return(true);
+	else // this means that there is a line intersection
+		// but not a ray intersection
+		return (false);
+}
 
 
 
@@ -2528,6 +2534,286 @@ void splitMesh(const hacd::HaF32 *planeEquation,const SimpleMesh &input,SimpleMe
 
 //
 
+static hacd::HaF32 enorm0_3d ( hacd::HaF32 x0, hacd::HaF32 y0, hacd::HaF32 z0, hacd::HaF32 x1, hacd::HaF32 y1, hacd::HaF32 z1 )
+
+/**********************************************************************/
+
+/*
+Purpose:
+
+ENORM0_3D computes the Euclidean norm of (P1-P0) in 3D.
+
+Modified:
+
+18 April 1999
+
+Author:
+
+John Burkardt
+
+Parameters:
+
+Input, hacd::HaF32 X0, Y0, Z0, X1, Y1, Z1, the coordinates of the points 
+P0 and P1.
+
+Output, hacd::HaF32 ENORM0_3D, the Euclidean norm of (P1-P0).
+*/
+{
+  hacd::HaF32 value;
+
+  value = ::sqrt (
+    ( x1 - x0 ) * ( x1 - x0 ) + 
+    ( y1 - y0 ) * ( y1 - y0 ) + 
+    ( z1 - z0 ) * ( z1 - z0 ) );
+
+  return value;
+}
+
+
+static hacd::HaF32 triangle_area_3d ( hacd::HaF32 x1, hacd::HaF32 y1, hacd::HaF32 z1, hacd::HaF32 x2,hacd::HaF32 y2, hacd::HaF32 z2, hacd::HaF32 x3, hacd::HaF32 y3, hacd::HaF32 z3 )
+
+                        /**********************************************************************/
+
+                        /*
+                        Purpose:
+
+                        TRIANGLE_AREA_3D computes the area of a triangle in 3D.
+
+                        Modified:
+
+                        22 April 1999
+
+                        Author:
+
+                        John Burkardt
+
+                        Parameters:
+
+                        Input, hacd::HaF32 X1, Y1, Z1, X2, Y2, Z2, X3, Y3, Z3, the (X,Y,Z)
+                        coordinates of the corners of the triangle.
+
+                        Output, hacd::HaF32 TRIANGLE_AREA_3D, the area of the triangle.
+                        */
+{
+  hacd::HaF32 a;
+  hacd::HaF32 alpha;
+  hacd::HaF32 area;
+  hacd::HaF32 b;
+  hacd::HaF32 base;
+  hacd::HaF32 c;
+  hacd::HaF32 dot;
+  hacd::HaF32 height;
+  /*
+  Find the projection of (P3-P1) onto (P2-P1).
+  */
+  dot = 
+    ( x2 - x1 ) * ( x3 - x1 ) +
+    ( y2 - y1 ) * ( y3 - y1 ) +
+    ( z2 - z1 ) * ( z3 - z1 );
+
+  base = enorm0_3d ( x1, y1, z1, x2, y2, z2 );
+  /*
+  The height of the triangle is the length of (P3-P1) after its
+  projection onto (P2-P1) has been subtracted.
+  */
+  if ( base == 0.0 ) {
+
+    height = 0.0;
+
+  }
+  else {
+
+    alpha = dot / ( base * base );
+
+    a = x3 - x1 - alpha * ( x2 - x1 );
+    b = y3 - y1 - alpha * ( y2 - y1 );
+    c = z3 - z1 - alpha * ( z2 - z1 );
+
+    height = ::sqrt ( a * a + b * b + c * c );
+
+  }
+
+  area = 0.5f * base * height;
+
+  return area;
+}
+
+
+hacd::HaF32 fm_computeArea(const hacd::HaF32 *p1,const hacd::HaF32 *p2,const hacd::HaF32 *p3)
+{
+  hacd::HaF32 ret = 0;
+
+  ret = triangle_area_3d(p1[0],p1[1],p1[2],p2[0],p2[1],p2[2],p3[0],p3[1],p3[2]);
+
+  return ret;
+}
+
+void validate(hacd::HaF32 v)
+{
+	HACD_ASSERT( v >= -1000 && v < 1000 );
+}
+
+void validate(const hacd::HaF32 *v)
+{
+	validate(v[0]);
+	validate(v[1]);
+	validate(v[2]);
+}
+
+
+void addVertex(const hacd::HaF32 *p,hacd::HaF32 *dest,hacd::HaU32 index)
+{
+	dest[index*3+0] = p[0];
+	dest[index*3+1] = p[1];
+	dest[index*3+2] = p[2];
+
+	validate( &dest[index*3]);
+
+}
+
+void addTriangle(hacd::HaU32 *indices,hacd::HaU32 i1,hacd::HaU32 i2,hacd::HaU32 i3,hacd::HaU32 index)
+{
+	indices[index*3+0] = i1;
+	indices[index*3+1] = i2;
+	indices[index*3+2] = i3;
+}
+
+bool projectRay(const hacd::HaF32 *p,const hacd::HaF32 *n,hacd::HaF32 *t,const HACD::HullResult &hull)
+{
+	bool ret = false;
+
+	t[0] = p[0];
+	t[1] = p[1];
+	t[2] = p[2];
+	validate(p);
+	validate(n);
+
+	for (hacd::HaU32 i=0; i<hull.mNumTriangles; i++)
+	{
+		hacd::HaI32 i1 = hull.mIndices[i*3+0];
+		hacd::HaI32 i2 = hull.mIndices[i*3+1];
+		hacd::HaI32 i3 = hull.mIndices[i*3+2];
+
+		const hacd::HaF32 *p1 = &hull.mOutputVertices[i1*3];
+		const hacd::HaF32 *p2 = &hull.mOutputVertices[i2*3];
+		const hacd::HaF32 *p3 = &hull.mOutputVertices[i3*3];
+
+		hacd::HaF32 tm;
+		if ( fm_rayIntersectsTriangle(p,n,p1,p2,p3,tm))
+		{
+			if ( tm > 100 )
+			{
+				fm_rayIntersectsTriangle(p,n,p1,p2,p3,tm);
+			}
+			t[0] = p[0]+n[0]*tm;
+			t[1] = p[1]+n[1]*tm;
+			t[2] = p[2]+n[2]*tm;
+			ret = true;
+			break;
+		}
+	}
+
+	if ( ret )
+	{
+		validate(t);
+	}
+
+	return ret;
+}
+
+hacd::HaF32 computeProjectedVolume(const hacd::HaF32 *p1,const hacd::HaF32 *p2,const hacd::HaF32 *p3,const HACD::HullResult &hull)
+{
+	hacd::HaF32 ret = 0;
+
+	hacd::HaF32 area = fm_computeArea(p1,p2,p3);
+	if ( area <= 0 ) 
+	{
+		return 0;
+	}
+
+	hacd::HaF32 normal[3];
+	fm_computePlane(p3,p2,p1,normal);
+
+	hacd::HaF32 t1[3];
+	hacd::HaF32 t2[3];
+	hacd::HaF32 t3[3];
+
+	bool hit1 = projectRay(p1,normal,t1,hull);
+	bool hit2 = projectRay(p2,normal,t2,hull);
+	bool hit3 = projectRay(p3,normal,t3,hull);
+
+	if ( hit1 || hit2 || hit3 )
+	{
+		// now we build the little triangle mesh piece...
+		hacd::HaU32 indices[8*3];
+
+		hacd::HaF32 vertices[6*3];
+		addVertex(p1,vertices,0);
+		addVertex(p2,vertices,1);
+		addVertex(p3,vertices,2);
+		addVertex(t1,vertices,3);
+		addVertex(t2,vertices,4);
+		addVertex(t3,vertices,5);
+
+		addTriangle(indices,2,1,0,0);
+		addTriangle(indices,3,4,5,1);
+
+		addTriangle(indices,0,3,4,2);
+		addTriangle(indices,0,4,1,3);
+
+		addTriangle(indices,2,5,3,4);
+		addTriangle(indices,2,3,0,5);
+
+		addTriangle(indices,1,4,5,6);
+		addTriangle(indices,1,5,2,7);
+
+		ret = fm_computeMeshVolume(vertices,8,indices);
+
+#if 0
+		static FILE *fph = fopen("project.obj", "wb" );
+		static int baseVertex = 1;
+		for (int i=0; i<6; i++)
+		{
+			fprintf(fph,"v %0.9f %0.9f %0.9f\r\n", vertices[i*3+0], vertices[i*3+1], vertices[i*3+2] );
+		}
+		for (int i=0; i<8; i++)
+		{
+			fprintf(fph,"f %d %d %d\r\n", indices[i*3+0]+baseVertex, indices[i*3+1]+baseVertex, indices[i*3+2]+baseVertex );
+		}
+		fflush(fph);
+		baseVertex+=6;
+#endif
+	}
+
+	return ret;
+}
+hacd::HaF32 computeConcavityVolume(hacd::HaU32 vcount,
+						   const hacd::HaF32 *vertices,
+						   hacd::HaU32 tcount,
+						   const hacd::HaU32 *indices,
+						   const HACD::HullResult &result)
+{
+	hacd::HaF32 ret = 0;
+
+	for (hacd::HaU32 i=0; i<tcount; i++)
+	{
+		hacd::HaU32 i1 = indices[i*3+0];
+		hacd::HaU32 i2 = indices[i*3+1];
+		hacd::HaU32 i3 = indices[i*3+2];
+
+		const hacd::HaF32 *p1 = &vertices[i1*3];
+		const hacd::HaF32 *p2 = &vertices[i2*3];
+		const hacd::HaF32 *p3 = &vertices[i3*3];
+
+		ret+=computeProjectedVolume(p1,p2,p3,result);
+
+	}
+
+	return ret;
+}
+
+//
+
 
 typedef hacd::vector< ConvexResult > ConvexResultVector;
 
@@ -2573,6 +2859,7 @@ void doConvexDecomposition(hacd::HaU32 vcount,
 	bool isCoplanar = fm_isMeshCoplanar(tcount,indices,vertices,true);
 	if ( isCoplanar ) return;
 
+
 	// Next build a convex hull for the input vertices for this mesh fragment
 	HACD::HullResult result;
 	HACD::HullLibrary hl;
@@ -2604,55 +2891,21 @@ void doConvexDecomposition(hacd::HaU32 vcount,
 			split = fm_computeSplitPlane(result.mNumOutputVertices,result.mOutputVertices,result.mNumTriangles,result.mIndices,plane);
 			if ( split )
 			{
+				{
+					hacd::HaF32 concaveVolume = computeConcavityVolume(vcount,vertices,tcount,indices,result);
+					hacd::HaF32 percentVolume = concaveVolume*100 / hullVolume;
+
+					if ( percentVolume < cdesc.mConcavePercent )
+					{
+						split = false;
+					}
+				}
+
 				SimpleMesh mesh(vcount, tcount, vertices, indices);
 				SimpleMesh leftMesh;
 				SimpleMesh rightMesh;
 				splitMesh(plane,mesh,leftMesh,rightMesh);
 
-				if ( leftMesh.mTcount && rightMesh.mTcount )
-				{
-					split = false;
-					hacd::HaF32 volumeA=0;
-					hacd::HaF32 volumeB=0;
-					// build the convex hull for the left split mesh and it's volume.
-					{
-						HACD::HullLibrary hl;
-						HACD::HullDesc   desc;
-						HACD::HullResult result;
-						desc.mVcount = leftMesh.mVcount;
-						desc.mVertices = leftMesh.mVertices;
-						desc.mVertexStride = sizeof(hacd::HaF32)*3;
-						HACD::HullError ret = hl.CreateConvexHull(desc,result);
-						if ( ret == HACD::QE_OK )
-						{
-							volumeA = fm_computeMeshVolume(result.mOutputVertices, result.mNumTriangles, result.mIndices );
-						}
-					}
-					{
-						HACD::HullLibrary hl;
-						HACD::HullDesc   desc;
-						HACD::HullResult result;
-						desc.mVcount = rightMesh.mVcount;
-						desc.mVertices = rightMesh.mVertices;
-						desc.mVertexStride = sizeof(hacd::HaF32)*3;
-						HACD::HullError ret = hl.CreateConvexHull(desc,result);
-						if ( ret == HACD::QE_OK )
-						{
-							volumeB = fm_computeMeshVolume(result.mOutputVertices, result.mNumTriangles, result.mIndices );
-						}
-					}
-
-					// ok, now the percentage difference volume between the two hulls seperate versus the two hulls combined.
-					hacd::HaF32 percent = ((hullVolume - (volumeA+volumeB))*100) / hullVolume;
-					if ( percent < cdesc.mConcavePercent )
-					{
-
-					}
-					else
-					{
-						split = true;  // it's concave, go ahead and split it!!
-					}
-				}
 				if ( split )
 				{
 

@@ -944,7 +944,8 @@ hacd::HaF64 dgConvexHull3d::RayCast (const dgBigVector& localP0, const dgBigVect
 	dgBigVector dS (localP1 - localP0); // is the segment direction vector;
 	hacd::HaI32 hasHit = 0;
 
-	for (dgListNode* node = GetFirst(); node; node = node->GetNext()) {
+	for (dgListNode* node = GetFirst(); node; node = node->GetNext()) 
+	{
 		const dgConvexHull3DFace* const face = &node->GetInfo();
 
 		hacd::HaI32 i0 = face->m_index[0];
@@ -957,33 +958,44 @@ hacd::HaF64 dgConvexHull3d::RayCast (const dgBigVector& localP0, const dgBigVect
 		hacd::HaF64 N = -((localP0 - p0) % normal);
 		hacd::HaF64 D = dS % normal;
 
-		if (fabs(D) < hacd::HaF64 (1.0e-12f)) { // 
-			if (N < hacd::HaF64 (0.0f)) {
+		if (fabs(D) < hacd::HaF64 (1.0e-12f)) 
+		{ // 
+			if (N < hacd::HaF64 (0.0f)) 
+			{
 				return hacd::HaF64 (1.2f);
-			} else {
+			} 
+			else 
+			{
 				continue; 
 			}
 		}
 
 		hacd::HaF64 t = N / D;
-		if (D < hacd::HaF64 (0.0f)) {
-			if (t > tE) {
+		if (D < hacd::HaF64 (0.0f)) 
+		{
+			if (t > tE) 
+			{
 				tE = t;
 				hasHit = 1;
 			}
-			if (tE > tL) {
+			if (tE > tL) 
+			{
 				return hacd::HaF64 (1.2f);
 			}
-		} else {
+		} 
+		else 
+		{
 			HACD_ASSERT (D >= hacd::HaF64 (0.0f));
 			tL = GetMin (tL, t);
-			if (tL < tE) {
+			if (tL < tE) 
+			{
 				return hacd::HaF64 (1.2f);
 			}
 		}
 	}
 
-	if (hasHit) {
+	if (hasHit) 
+	{
 		interset = tE;	
 	}
 
