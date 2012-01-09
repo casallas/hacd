@@ -40,10 +40,6 @@ namespace THREAD_CONFIG
 unsigned int tc_timeGetTime(void);
 void     tc_sleep(unsigned int ms);
 
-void     tc_spinloop();
-void     tc_interlockedExchange(void *dest, const int64_t exchange);
-int      tc_interlockedCompareExchange(void *dest, int exchange, int compare);
-int      tc_interlockedCompareExchange(void *dest, const int exchange1, const int exchange2, const int compare1, const int compare2);
 int		tc_atomicAdd(int *addend,int amount);
 
 class ThreadMutex

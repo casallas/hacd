@@ -30,7 +30,7 @@
 
 */
 
-namespace LOCK_FREE_Q
+namespace THREAD_SAFE_QUEUE
 {
 
   // reader-writer circular queue.. one thread writes, one thread reads only...
@@ -114,7 +114,7 @@ namespace LOCK_FREE_Q
     node_t *pNext;
   };
 
-  class LockFreeQ
+  class ThreadSafeQueue
   {
   public:
     virtual node_t * getHead() = 0;
@@ -125,8 +125,8 @@ namespace LOCK_FREE_Q
 
 
 
-  LockFreeQ * createLockFreeQ(void);
-  void        releaseLockFreeQ(LockFreeQ *q);
+  ThreadSafeQueue * createLockFreeQ(void);
+  void        releaseLockFreeQ(ThreadSafeQueue *q);
 
 };
 

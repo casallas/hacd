@@ -92,8 +92,8 @@ public:
 				if ( v.z < bmin.z ) bmin.z = v.z;
 
 				if ( v.x > bmax.x ) bmax.x = v.x;
-				if ( v.y > bmax.x ) bmax.y = v.y;
-				if ( v.z > bmax.x ) bmax.z = v.z;
+				if ( v.y > bmax.y ) bmax.y = v.y;
+				if ( v.z > bmax.z ) bmax.z = v.z;
 
 			}
 			source+=3;

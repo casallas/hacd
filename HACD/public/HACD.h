@@ -69,7 +69,7 @@ public:
 		void init(void)
 		{
 			mDecompositionDepth = 0;
-			mNormalizeInputMesh = true;
+			mNormalizeInputMesh = false;
 			mJobSwarmContext = NULL;
 			mTriangleCount = 0;
 			mVertexCount = 0;

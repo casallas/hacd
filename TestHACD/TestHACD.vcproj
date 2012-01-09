@@ -421,14 +421,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\jobswarm\LockFreeQ.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\jobswarm\LockFreeQ.h"
-				>
-			</File>
-			<File
 				RelativePath="..\jobswarm\pool.h"
 				>
 			</File>
@@ -438,6 +430,14 @@
 			</File>
 			<File
 				RelativePath="..\jobswarm\ThreadConfig.h"
+				>
+			</File>
+			<File
+				RelativePath="..\jobswarm\ThreadSafeQueue.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\jobswarm\ThreadSafeQueue.h"
 				>
 			</File>
 		</Filter>

@@ -123,6 +123,7 @@ void main(int argc,const char ** argv)
 		printf("-b <backFaceDistanceFactor : The back face distance factor, default is 0.01; set to larger values for hollow objects.\r\n");
 		printf("-t <threadCount> : Specifies the number of threads to use for a multi-threaded implementation\r\n");
 		printf("-d <decompositionDepth> : Specifies the decomposition depth; uses legacy ACD instead of HACD\r\n");
+		printf("-n : Normalize the input mesh.\r\n");
 		printf("\r\n");
 		printf("Example: TestHACD hornbug.obj -m 40 -v 64\r\n");
 		printf("\r\n");
@@ -177,6 +178,11 @@ void main(int argc,const char ** argv)
 			{
 				desc.mConcavity = getFloatArg(scan+1,argc,argv);
 				scan+=2;
+			}
+			else if ( strcmp(option,"-n") == 0 )
+			{
+				desc.mNormalizeInputMesh = true;
+				scan++;
 			}
 			else
 			{

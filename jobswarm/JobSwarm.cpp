@@ -32,7 +32,7 @@
 */
 #include "JobSwarm.h"
 #include "ThreadConfig.h"
-#include "LockFreeQ.h"
+#include "ThreadSafeQueue.h"
 #include "pool.h"
 
 JOB_SWARM::JobSwarmContext *gJobSwarmContext=0;
@@ -48,7 +48,7 @@ namespace JOB_SWARM
 
 
 
-class SwarmJob : public LOCK_FREE_Q::node_t
+class SwarmJob : public THREAD_SAFE_QUEUE::node_t
 {
 public:
 	SwarmJob(void)
@@ -199,7 +199,7 @@ public:
 	bool						mExitComplete;
 	THREAD_CONFIG::Thread		*mThread;
 	JobScheduler				*mJobScheduler;			// provides new jobs to perform
-	LOCK_FREE_Q::CQueue< SwarmJob * > mFinished;		// jobs that have been completed and may be reported back to the application.
+	THREAD_SAFE_QUEUE::CQueue< SwarmJob * > mFinished;		// jobs that have been completed and may be reported back to the application.
 };
 
   class JobScheduler : public JobSwarmContext, public UANS::UserAllocated
@@ -215,7 +215,7 @@ public:
 		mPendingCount = 0;
 		mUseThreads = true;
 		maxThreadCount = maxThreadCount;
-		mPending = LOCK_FREE_Q::createLockFreeQ();
+		mPending = THREAD_SAFE_QUEUE::createLockFreeQ();
 		mJobs.Set(100,100,100000000,"JobScheduler->mJobs",__FILE__,__LINE__);
 		mMaxThreadCount = maxThreadCount;
 		mThreads = HACD_NEW(ThreadWorker)[mMaxThreadCount]; // the number of worker threads....
@@ -232,7 +232,7 @@ public:
 	~JobScheduler(void)
 	{
 		delete []mThreads;
-		LOCK_FREE_Q::releaseLockFreeQ(mPending);
+		THREAD_SAFE_QUEUE::releaseLockFreeQ(mPending);
 	}
 
 	// Happens in main thread
@@ -394,7 +394,7 @@ public:
 private:
 	bool					mUseThreads;
 	hacd::HaU32				mMaxThreadCount;
-	LOCK_FREE_Q::LockFreeQ *mPending;
+	THREAD_SAFE_QUEUE::ThreadSafeQueue *mPending;
 	Pool< SwarmJob >		mJobs;
 	ThreadWorker			*mThreads;
 	hacd::HaI32				mPendingCount;
