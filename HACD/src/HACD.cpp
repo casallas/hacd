@@ -252,7 +252,7 @@ public:
 						}
 						if ( desc.mUseFastVersion )
 						{
-							result = mesh.CreateConvexApproximationFast(desc.mConcavity,desc.mMaxHullCount);
+							result = mesh.CreateConvexApproximationFast(desc.mConcavity,desc.mMaxHullCount,desc.mCallback);
 						}
 						else
 						{

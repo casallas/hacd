@@ -220,8 +220,13 @@ class dgMeshEffect: public dgPolyhedra, public dgRefCounter, public UANS::UserAl
 		hacd::ICallback *reportProgressCallback) const;
 
 	// Old, Legacy, 'fast' version
-	dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconcavity, hacd::HaI32 maxCount,bool legacyVersion);
-	dgMeshEffect* CreateConvexApproximationFast(hacd::HaF32 maxConcavity, hacd::HaI32 maxCount) const;
+	dgMeshEffect(const dgMeshEffect& source,
+				hacd::HaF32 absoluteconcavity,
+				hacd::HaI32 maxCount,
+				hacd::ICallback *callback,
+				bool legacyVersion);
+
+	dgMeshEffect* CreateConvexApproximationFast(hacd::HaF32 maxConcavity, hacd::HaI32 maxCount,hacd::ICallback *callback) const;
 
 	dgMeshEffect* CreateSimplification(hacd::HaI32 maxVertexCount, hacd::ICallback *reportProgressCallback) const;
 
