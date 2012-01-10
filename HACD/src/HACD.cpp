@@ -174,6 +174,7 @@ public:
 			if ( desc.mDecompositionDepth ) // if using legacy ACD
 			{
 				TIMEIT("Perform ACD");
+
 				CONVEX_DECOMPOSITION::ConvexDecomposition *cd = CONVEX_DECOMPOSITION::createConvexDecomposition();
 
 				CONVEX_DECOMPOSITION::DecompDesc dcompDesc;
@@ -249,7 +250,14 @@ public:
 						{
 							_desc.mCallback->ReportProgress("Begin HACD",1);
 						}
-						result = mesh.CreateConvexApproximation(desc.mConcavity,desc.mBackFaceDistanceFactor,desc.mMaxHullCount,desc.mMaxHullVertices,desc.mJobSwarmContext, desc.mCallback);
+						if ( desc.mUseFastVersion )
+						{
+							result = mesh.CreateConvexApproximationFast(desc.mConcavity,desc.mMaxHullCount);
+						}
+						else
+						{
+							result = mesh.CreateConvexApproximation(desc.mConcavity,desc.mBackFaceDistanceFactor,desc.mMaxHullCount,desc.mMaxHullVertices,desc.mJobSwarmContext, desc.mCallback);
+						}
 					}
 
 					if ( result )

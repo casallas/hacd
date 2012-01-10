@@ -209,9 +209,9 @@ class dgMeshEffect: public dgPolyhedra, public dgRefCounter, public UANS::UserAl
 	void GetMaterialGetIndexStream (dgIndexArray* const handle, hacd::HaI32 materialHandle, hacd::HaI32* const index);
 	void GetMaterialGetIndexStreamShort (dgIndexArray* const handle, hacd::HaI32 materialHandle, hacd::HaI16* const index);
 	
-	dgConvexHull3d * dgMeshEffect::CreateConvexHull(hacd::HaF64 tolerance,hacd::HaI32 maxVertexCount) const;
+	dgConvexHull3d * CreateConvexHull(hacd::HaF64 tolerance,hacd::HaI32 maxVertexCount) const;
 
-	dgMeshEffect* dgMeshEffect::CreateConvexApproximation(
+	dgMeshEffect* CreateConvexApproximation(
 		hacd::HaF32 maxConcavity, 
 		hacd::HaF32 backFaceDistanceFactor, 
 		hacd::HaI32 maxHullsCount, 
@@ -219,7 +219,11 @@ class dgMeshEffect: public dgPolyhedra, public dgRefCounter, public UANS::UserAl
 		JOB_SWARM::JobSwarmContext *jobSwarmContext,
 		hacd::ICallback *reportProgressCallback) const;
 
-	dgMeshEffect* dgMeshEffect::CreateSimplification(hacd::HaI32 maxVertexCount, hacd::ICallback *reportProgressCallback) const;
+	// Old, Legacy, 'fast' version
+	dgMeshEffect(const dgMeshEffect& source, hacd::HaF32 absoluteconcavity, hacd::HaI32 maxCount,bool legacyVersion);
+	dgMeshEffect* CreateConvexApproximationFast(hacd::HaF32 maxConcavity, hacd::HaI32 maxCount) const;
+
+	dgMeshEffect* CreateSimplification(hacd::HaI32 maxVertexCount, hacd::ICallback *reportProgressCallback) const;
 
 	dgVertexAtribute& GetAttribute (hacd::HaI32 index) const;
 	void TransformMesh (const dgMatrix& matrix);

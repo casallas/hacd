@@ -53,6 +53,7 @@ public:
 		}
 
 		bool				mNormalizeInputMesh;
+		bool				mUseFastVersion;
 		hacd::HaU32			mTriangleCount;
 		hacd::HaU32			mVertexCount;
 		const hacd::HaF32	*mVertices;
@@ -80,7 +81,8 @@ public:
 			mMaxHullVertices = 64;
 			mConcavity = 0.2f;
 			mSmallClusterThreshold = 0.0f;
-			mBackFaceDistanceFactor = 0.01f;
+			mBackFaceDistanceFactor = 0.2f;
+			mUseFastVersion = false;
 			mCallback = NULL;
 		}
 	};
