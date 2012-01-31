@@ -286,6 +286,7 @@ void main(int argc,const char ** argv)
 							{
 								hacd::HaU32 startVertex = baseVertex[i];
 								fprintf(fph,"# Convex Hull %d contains %d triangles and %d vertices.  Starting vertex index is: %d It has a volume of: %0.9f\r\n", i+1, hull->mTriangleCount, hull->mVertexCount, startVertex);
+								fprintf(fph,"g convex_hull%d\r\n", i+1);
 								for (hacd::HaU32 j=0; j<hull->mTriangleCount; j++)
 								{
 									hacd::HaU32 i1 = hull->mIndices[j*3+0]+startVertex+1;
